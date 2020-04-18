@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Implementation-Title: ProtocolLib
+Implementation-Version: 4.4.0-b421
+Built-By: WIN-QAITGSSVVQC$
+Created-By: Apache Maven 3.3.9
+Build-Jdk: 1.8.0_131
+Implementation-Vendor: dmulloy2
+Main-Class: com.comphenix.protocol.Application
+
