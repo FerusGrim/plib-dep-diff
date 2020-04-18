@@ -1,13 +1,9 @@
 package com.comphenix.protocol.wrappers;
 
-import com.comphenix.protocol.reflect.accessors.Accessors;
-import org.apache.commons.lang.Validate;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.HashMap;
 import java.util.Locale;
 import org.bukkit.GameMode;
 import com.google.common.collect.Maps;
-import com.comphenix.protocol.ProtocolLogger;
 import com.comphenix.protocol.reflect.FuzzyReflection;
 import java.lang.reflect.Field;
 import com.comphenix.protocol.PacketType;
@@ -52,12 +48,7 @@ public abstract class EnumWrappers
         EnumWrappers.PROTOCOL_CLASS = getEnum(PacketType.Handshake.Client.SET_PROTOCOL.getPacketClass(), 0);
         EnumWrappers.CLIENT_COMMAND_CLASS = getEnum(PacketType.Play.Client.CLIENT_COMMAND.getPacketClass(), 0);
         EnumWrappers.CHAT_VISIBILITY_CLASS = getEnum(PacketType.Play.Client.SETTINGS.getPacketClass(), 0);
-        try {
-            EnumWrappers.DIFFICULTY_CLASS = getEnum(PacketType.Play.Server.SERVER_DIFFICULTY.getPacketClass(), 0);
-        }
-        catch (Exception ex) {
-            EnumWrappers.DIFFICULTY_CLASS = getEnum(PacketType.Play.Server.LOGIN.getPacketClass(), 1);
-        }
+        EnumWrappers.DIFFICULTY_CLASS = getEnum(PacketType.Play.Server.LOGIN.getPacketClass(), 1);
         EnumWrappers.ENTITY_USE_ACTION_CLASS = getEnum(PacketType.Play.Client.USE_ENTITY.getPacketClass(), 0);
         EnumWrappers.GAMEMODE_CLASS = getEnum(PacketType.Play.Server.LOGIN.getPacketClass(), 0);
         EnumWrappers.RESOURCE_PACK_STATUS_CLASS = getEnum(PacketType.Play.Client.RESOURCE_PACK_STATUS.getPacketClass(), 0);
@@ -109,7 +100,6 @@ public abstract class EnumWrappers
             return FuzzyReflection.fromClass(clazz, true).getFieldListByType(Enum.class).get(index).getType();
         }
         catch (Throwable ex) {
-            ProtocolLogger.debug("Exception getting enum from " + clazz + " at index " + index, ex);
             return null;
         }
     }
@@ -271,7 +261,7 @@ public abstract class EnumWrappers
     }
     
     public static EquivalentConverter<PlayerAction> getEntityActionConverter() {
-        return new AliasedEnumConverter<PlayerAction>(getPlayerActionClass(), PlayerAction.class);
+        return new EnumConverter<PlayerAction>(getPlayerActionClass(), PlayerAction.class);
     }
     
     public static EquivalentConverter<ScoreboardAction> getUpdateScoreActionConverter() {
@@ -438,7 +428,6 @@ public abstract class EnumWrappers
     {
         TITLE, 
         SUBTITLE, 
-        ACTIONBAR, 
         TIMES, 
         CLEAR, 
         RESET;
@@ -472,28 +461,17 @@ public abstract class EnumWrappers
         SWAP_HELD_ITEMS;
     }
     
-    public enum PlayerAction implements AliasedEnum
+    public enum PlayerAction
     {
-        START_SNEAKING(new String[] { "PRESS_SHIFT_KEY" }), 
-        STOP_SNEAKING(new String[] { "RELEASE_SHIFT_KEY" }), 
-        STOP_SLEEPING(new String[0]), 
-        START_SPRINTING(new String[0]), 
-        STOP_SPRINTING(new String[0]), 
-        START_RIDING_JUMP(new String[0]), 
-        STOP_RIDING_JUMP(new String[0]), 
-        OPEN_INVENTORY(new String[0]), 
-        START_FALL_FLYING(new String[0]);
-        
-        String[] aliases;
-        
-        private PlayerAction(final String[] aliases) {
-            this.aliases = aliases;
-        }
-        
-        @Override
-        public String[] getAliases() {
-            return this.aliases;
-        }
+        START_SNEAKING, 
+        STOP_SNEAKING, 
+        STOP_SLEEPING, 
+        START_SPRINTING, 
+        STOP_SPRINTING, 
+        START_RIDING_JUMP, 
+        STOP_RIDING_JUMP, 
+        OPEN_INVENTORY, 
+        START_FALL_FLYING;
     }
     
     public enum ScoreboardAction
@@ -670,12 +648,18 @@ public abstract class EnumWrappers
     
     public enum ChatType
     {
-        CHAT, 
-        SYSTEM, 
-        GAME_INFO;
+        CHAT(0), 
+        SYSTEM(1), 
+        GAME_INFO(2);
+        
+        private byte id;
+        
+        private ChatType(final int id) {
+            this.id = (byte)id;
+        }
         
         public byte getId() {
-            return (byte)this.ordinal();
+            return this.id;
         }
     }
     
@@ -707,201 +691,5 @@ public abstract class EnumWrappers
         void setGenericType(final Class<?> genericType) {
             this.genericType = genericType;
         }
-    }
-    
-    public static class AliasedEnumConverter<T extends java.lang.Enum> implements EquivalentConverter<T>
-    {
-        private Class<?> genericType;
-        private Class<T> specificType;
-        private Map<T, Object> genericMap;
-        private Map<Object, T> specificMap;
-        
-        public AliasedEnumConverter(final Class<?> genericType, final Class<T> specificType) {
-            this.genericMap = new ConcurrentHashMap<T, Object>();
-            this.specificMap = new ConcurrentHashMap<Object, T>();
-            this.genericType = genericType;
-            this.specificType = specificType;
-        }
-        
-        @Override
-        public T getSpecific(final Object generic) {
-            final String name;
-            Enum[] array;
-            int length;
-            int i = 0;
-            T elem;
-            final String[] array2;
-            int length2;
-            int j = 0;
-            String alias;
-            final IllegalArgumentException ex2;
-            return this.specificMap.computeIfAbsent(generic, x -> {
-                name = ((Enum)generic).name();
-                try {
-                    return Enum.valueOf(this.specificType, name);
-                }
-                catch (Exception ex) {
-                    array = (Enum[])this.specificType.getEnumConstants();
-                    for (length = array.length; i < length; ++i) {
-                        elem = (T)array[i];
-                        ((AliasedEnum)elem).getAliases();
-                        length2 = array2.length;
-                        while (j < length2) {
-                            alias = array2[j];
-                            if (alias.equals(name)) {
-                                return elem;
-                            }
-                            else {
-                                ++j;
-                            }
-                        }
-                    }
-                    new IllegalArgumentException("Unknown enum constant " + name);
-                    throw ex2;
-                }
-            });
-        }
-        
-        @Override
-        public Object getGeneric(final T specific) {
-            final String name;
-            final Object[] array;
-            int length;
-            int i = 0;
-            Object rawElem;
-            Enum elem;
-            final String[] array2;
-            int length2;
-            int j = 0;
-            String alias;
-            final IllegalArgumentException ex2;
-            return this.genericMap.computeIfAbsent(specific, x -> {
-                name = ((Enum)specific).name();
-                try {
-                    return Enum.valueOf(this.genericType, ((Enum)specific).name());
-                }
-                catch (Exception ex) {
-                    this.genericType.getEnumConstants();
-                    for (length = array.length; i < length; ++i) {
-                        rawElem = array[i];
-                        elem = (Enum)rawElem;
-                        ((AliasedEnum)specific).getAliases();
-                        length2 = array2.length;
-                        while (j < length2) {
-                            alias = array2[j];
-                            if (alias.equals(elem.name())) {
-                                return elem;
-                            }
-                            else {
-                                ++j;
-                            }
-                        }
-                    }
-                    new IllegalArgumentException("Unknown enum constant " + name);
-                    throw ex2;
-                }
-            });
-        }
-        
-        @Override
-        public Class<T> getSpecificType() {
-            return this.specificType;
-        }
-    }
-    
-    public static class FauxEnumConverter<T extends Enum<T>> implements EquivalentConverter<T>
-    {
-        private final Class<T> specificClass;
-        private final Class<?> genericClass;
-        private final Map<Object, T> lookup;
-        
-        public FauxEnumConverter(final Class<T> specific, final Class<?> generic) {
-            Validate.notNull((Object)specific, "specific class cannot be null");
-            Validate.notNull((Object)generic, "generic class cannot be null");
-            this.specificClass = specific;
-            this.genericClass = generic;
-            this.lookup = new HashMap<Object, T>();
-        }
-        
-        @Override
-        public Object getGeneric(final T specific) {
-            Validate.notNull((Object)specific, "specific object cannot be null");
-            return Accessors.getFieldAccessor(this.genericClass, specific.name(), false).get(null);
-        }
-        
-        @Override
-        public T getSpecific(final Object generic) {
-            Validate.notNull(generic, "generic object cannot be null");
-            final Field[] array;
-            int length;
-            int i = 0;
-            Field field;
-            final IllegalArgumentException ex;
-            return this.lookup.computeIfAbsent(generic, x -> {
-                this.genericClass.getFields();
-                for (length = array.length; i < length; ++i) {
-                    field = array[i];
-                    try {
-                        if (!field.isAccessible()) {
-                            field.setAccessible(true);
-                        }
-                        if (field.get(null) == generic) {
-                            return Enum.valueOf(this.specificClass, field.getName().toUpperCase());
-                        }
-                    }
-                    catch (ReflectiveOperationException ex2) {}
-                }
-                new IllegalArgumentException("Could not find ProtocolLib wrapper for " + generic);
-                throw ex;
-            });
-        }
-        
-        @Override
-        public Class<T> getSpecificType() {
-            return this.specificClass;
-        }
-    }
-    
-    public static class IndexedEnumConverter<T extends Enum<T>> implements EquivalentConverter<T>
-    {
-        private Class<T> specificClass;
-        private Class<?> genericClass;
-        
-        public IndexedEnumConverter(final Class<T> specificClass, final Class<?> genericClass) {
-            this.specificClass = specificClass;
-            this.genericClass = genericClass;
-        }
-        
-        @Override
-        public Object getGeneric(final T specific) {
-            final int ordinal = specific.ordinal();
-            for (final Object elem : this.genericClass.getEnumConstants()) {
-                if (((Enum)elem).ordinal() == ordinal) {
-                    return elem;
-                }
-            }
-            return null;
-        }
-        
-        @Override
-        public T getSpecific(final Object generic) {
-            final int ordinal = ((Enum)generic).ordinal();
-            for (final T elem : this.specificClass.getEnumConstants()) {
-                if (elem.ordinal() == ordinal) {
-                    return elem;
-                }
-            }
-            return null;
-        }
-        
-        @Override
-        public Class<T> getSpecificType() {
-            return this.specificClass;
-        }
-    }
-    
-    public interface AliasedEnum
-    {
-        String[] getAliases();
     }
 }

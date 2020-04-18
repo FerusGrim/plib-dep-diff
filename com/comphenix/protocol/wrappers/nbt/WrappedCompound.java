@@ -1,6 +1,5 @@
 package com.comphenix.protocol.wrappers.nbt;
 
-import com.comphenix.protocol.wrappers.ClonableWrapper;
 import com.comphenix.protocol.wrappers.nbt.io.NbtBinarySerializer;
 import java.io.DataOutput;
 import java.util.Set;
@@ -134,8 +133,7 @@ class WrappedCompound implements NbtWrapper<Map<String, NbtBase<?>>>, NbtCompoun
     public NbtBase<?> getValueOrDefault(final String key, final NbtType type) {
         NbtBase<?> nbt = this.getValue(key);
         if (nbt == null) {
-            nbt = NbtFactory.ofWrapper(type, key);
-            this.put(nbt);
+            this.put(nbt = NbtFactory.ofWrapper(type, key));
         }
         else if (nbt.getType() != type) {
             throw new IllegalArgumentException("Cannot get tag " + nbt + ": Not a " + type);

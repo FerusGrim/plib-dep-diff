@@ -25,7 +25,6 @@ import java.util.List;
 import com.google.common.collect.Iterables;
 import com.comphenix.protocol.utility.MinecraftReflection;
 import com.google.common.collect.Lists;
-import java.util.function.Consumer;
 import com.comphenix.protocol.utility.MinecraftVersion;
 import java.io.Serializable;
 
@@ -41,12 +40,10 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
     private final int legacyId;
     private final MinecraftVersion version;
     private final String[] classNames;
-    String[] names;
     private String name;
     private boolean deprecated;
     private boolean forceAsync;
     private boolean dynamic;
-    static Consumer<String> onDynamicCreate;
     
     private static PacketTypeLookup getLookup() {
         if (PacketType.LOOKUP == null) {
@@ -107,7 +104,7 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
     }
     
     public static PacketType findCurrent(final Protocol protocol, final Sender sender, String name) {
-        name = formatClassName(protocol, sender, name);
+        name = format(protocol, sender, name);
         final PacketType type = getLookup().getFromCurrent(protocol, sender, name);
         if (type != null) {
             return type;
@@ -115,18 +112,11 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
         throw new IllegalArgumentException("Cannot find packet " + name + "(Protocol: " + protocol + ", Sender: " + sender + ")");
     }
     
-    private static String formatClassName(final Protocol protocol, final Sender sender, final String name) {
-        final String base = MinecraftReflection.getMinecraftPackage() + ".Packet";
-        if (name.startsWith(base)) {
+    private static String format(final Protocol protocol, final Sender sender, final String name) {
+        if (name.contains("Packet")) {
             return name;
         }
-        if (name.contains("$")) {
-            final String[] split = name.split("\\$");
-            final String parent = split[0];
-            final String child = split[1];
-            return base + protocol.getPacketName() + sender.getPacketName() + WordUtils.capitalize(parent) + "$Packet" + protocol.getPacketName() + sender.getPacketName() + WordUtils.capitalize(child);
-        }
-        return base + protocol.getPacketName() + sender.getPacketName() + WordUtils.capitalize(name);
+        return String.format("Packet%s%s%s", protocol.getPacketName(), sender.getPacketName(), WordUtils.capitalize(name));
     }
     
     public static boolean hasCurrent(final Protocol protocol, final Sender sender, final int packetId) {
@@ -159,13 +149,12 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
     public static PacketType fromCurrent(final Protocol protocol, final Sender sender, final int packetId, final Class<?> packetClass) {
         final PacketTypeLookup.ClassLookup lookup = getLookup().getClassLookup();
         final Map<String, PacketType> map = lookup.getMap(protocol, sender);
-        final String className = packetClass.getName();
-        PacketType type = find(map, className);
+        final String clazz = packetClass.getSimpleName();
+        PacketType type = find(map, clazz);
         if (type == null) {
-            type = new PacketType(protocol, sender, packetId, -1, PacketType.PROTOCOL_VERSION, new String[] { className });
+            type = new PacketType(protocol, sender, packetId, -1, PacketType.PROTOCOL_VERSION, new String[] { clazz });
             type.dynamic = true;
             scheduleRegister(type, "Dynamic-" + UUID.randomUUID().toString());
-            PacketType.onDynamicCreate.accept(className);
         }
         return type;
     }
@@ -265,9 +254,8 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
         this.version = version;
         this.classNames = new String[names.length];
         for (int i = 0; i < this.classNames.length; ++i) {
-            this.classNames[i] = formatClassName(protocol, sender, names[i]);
+            this.classNames[i] = format(protocol, sender, names[i]);
         }
-        this.names = names;
     }
     
     public static PacketType newLegacy(final Sender sender, final int legacyId) {
@@ -294,7 +282,6 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
         return this.sender == Sender.SERVER;
     }
     
-    @Deprecated
     public int getCurrentId() {
         return this.currentId;
     }
@@ -390,8 +377,7 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
     }
     
     static {
-        PROTOCOL_VERSION = MinecraftVersion.VILLAGE_UPDATE;
-        PacketType.onDynamicCreate = (x -> {});
+        PROTOCOL_VERSION = MinecraftVersion.EXPLORATION_UPDATE;
     }
     
     public static class Handshake
@@ -476,19 +462,18 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             public static final PacketType NAMED_ENTITY_SPAWN;
             public static final PacketType ANIMATION;
             public static final PacketType STATISTIC;
-            public static final PacketType BLOCK_BREAK;
             public static final PacketType BLOCK_BREAK_ANIMATION;
             public static final PacketType TILE_ENTITY_DATA;
             public static final PacketType BLOCK_ACTION;
             public static final PacketType BLOCK_CHANGE;
             public static final PacketType BOSS;
             public static final PacketType SERVER_DIFFICULTY;
+            public static final PacketType TAB_COMPLETE;
             public static final PacketType CHAT;
             public static final PacketType MULTI_BLOCK_CHANGE;
-            public static final PacketType TAB_COMPLETE;
-            public static final PacketType COMMANDS;
             public static final PacketType TRANSACTION;
             public static final PacketType CLOSE_WINDOW;
+            public static final PacketType OPEN_WINDOW;
             public static final PacketType WINDOW_ITEMS;
             public static final PacketType WINDOW_DATA;
             public static final PacketType SET_SLOT;
@@ -500,29 +485,24 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             public static final PacketType EXPLOSION;
             public static final PacketType UNLOAD_CHUNK;
             public static final PacketType GAME_STATE_CHANGE;
-            public static final PacketType OPEN_WINDOW_HORSE;
             public static final PacketType KEEP_ALIVE;
             public static final PacketType MAP_CHUNK;
             public static final PacketType WORLD_EVENT;
             public static final PacketType WORLD_PARTICLES;
-            public static final PacketType LIGHT_UPDATE;
             public static final PacketType LOGIN;
             public static final PacketType MAP;
-            public static final PacketType OPEN_WINDOW_MERCHANT;
+            public static final PacketType ENTITY;
             public static final PacketType REL_ENTITY_MOVE;
             public static final PacketType REL_ENTITY_MOVE_LOOK;
             public static final PacketType ENTITY_LOOK;
-            public static final PacketType ENTITY;
             public static final PacketType VEHICLE_MOVE;
-            public static final PacketType OPEN_BOOK;
-            public static final PacketType OPEN_WINDOW;
             public static final PacketType OPEN_SIGN_EDITOR;
             public static final PacketType AUTO_RECIPE;
             public static final PacketType ABILITIES;
             public static final PacketType COMBAT_EVENT;
             public static final PacketType PLAYER_INFO;
-            public static final PacketType LOOK_AT;
             public static final PacketType POSITION;
+            public static final PacketType BED;
             public static final PacketType RECIPES;
             public static final PacketType ENTITY_DESTROY;
             public static final PacketType REMOVE_ENTITY_EFFECT;
@@ -533,8 +513,6 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             public static final PacketType WORLD_BORDER;
             public static final PacketType CAMERA;
             public static final PacketType HELD_ITEM_SLOT;
-            public static final PacketType VIEW_CENTRE;
-            public static final PacketType VIEW_DISTANCE;
             public static final PacketType SCOREBOARD_DISPLAY_OBJECTIVE;
             public static final PacketType ENTITY_METADATA;
             public static final PacketType ATTACH_ENTITY;
@@ -549,18 +527,13 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             public static final PacketType SPAWN_POSITION;
             public static final PacketType UPDATE_TIME;
             public static final PacketType TITLE;
-            public static final PacketType ENTITY_SOUND;
             public static final PacketType NAMED_SOUND_EFFECT;
-            public static final PacketType STOP_SOUND;
             public static final PacketType PLAYER_LIST_HEADER_FOOTER;
-            public static final PacketType NBT_QUERY;
             public static final PacketType COLLECT;
             public static final PacketType ENTITY_TELEPORT;
             public static final PacketType ADVANCEMENTS;
             public static final PacketType UPDATE_ATTRIBUTES;
             public static final PacketType ENTITY_EFFECT;
-            public static final PacketType RECIPE_UPDATE;
-            public static final PacketType TAGS;
             @Deprecated
             public static final PacketType MAP_CHUNK_BULK;
             @Deprecated
@@ -577,10 +550,6 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             public static final PacketType OPEN_SIGN_ENTITY;
             @Deprecated
             public static final PacketType UPDATE_SIGN;
-            @Deprecated
-            public static final PacketType BED;
-            @Deprecated
-            public static final PacketType USE_BED;
             private static final Server INSTANCE;
             
             private Server() {
@@ -596,99 +565,86 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             
             static {
                 SENDER = Sender.SERVER;
-                SPAWN_ENTITY = new PacketType(Play.PROTOCOL, Server.SENDER, 0, 255, new String[] { "SpawnEntity" });
-                SPAWN_ENTITY_EXPERIENCE_ORB = new PacketType(Play.PROTOCOL, Server.SENDER, 1, 255, new String[] { "SpawnEntityExperienceOrb" });
-                SPAWN_ENTITY_WEATHER = new PacketType(Play.PROTOCOL, Server.SENDER, 2, 255, new String[] { "SpawnEntityWeather" });
-                SPAWN_ENTITY_LIVING = new PacketType(Play.PROTOCOL, Server.SENDER, 3, 255, new String[] { "SpawnEntityLiving" });
-                SPAWN_ENTITY_PAINTING = new PacketType(Play.PROTOCOL, Server.SENDER, 4, 255, new String[] { "SpawnEntityPainting" });
-                NAMED_ENTITY_SPAWN = new PacketType(Play.PROTOCOL, Server.SENDER, 5, 255, new String[] { "NamedEntitySpawn" });
-                ANIMATION = new PacketType(Play.PROTOCOL, Server.SENDER, 6, 255, new String[] { "Animation" });
-                STATISTIC = new PacketType(Play.PROTOCOL, Server.SENDER, 7, 255, new String[] { "Statistic" });
-                BLOCK_BREAK = new PacketType(Play.PROTOCOL, Server.SENDER, 8, 255, new String[] { "BlockBreak" });
-                BLOCK_BREAK_ANIMATION = new PacketType(Play.PROTOCOL, Server.SENDER, 9, 255, new String[] { "BlockBreakAnimation" });
-                TILE_ENTITY_DATA = new PacketType(Play.PROTOCOL, Server.SENDER, 10, 255, new String[] { "TileEntityData" });
-                BLOCK_ACTION = new PacketType(Play.PROTOCOL, Server.SENDER, 11, 255, new String[] { "BlockAction" });
-                BLOCK_CHANGE = new PacketType(Play.PROTOCOL, Server.SENDER, 12, 255, new String[] { "BlockChange" });
-                BOSS = new PacketType(Play.PROTOCOL, Server.SENDER, 13, 255, new String[] { "Boss" });
-                SERVER_DIFFICULTY = new PacketType(Play.PROTOCOL, Server.SENDER, 14, 255, new String[] { "ServerDifficulty" });
-                CHAT = new PacketType(Play.PROTOCOL, Server.SENDER, 15, 255, new String[] { "Chat" });
-                MULTI_BLOCK_CHANGE = new PacketType(Play.PROTOCOL, Server.SENDER, 16, 255, new String[] { "MultiBlockChange" });
-                TAB_COMPLETE = new PacketType(Play.PROTOCOL, Server.SENDER, 17, 255, new String[] { "TabComplete" });
-                COMMANDS = new PacketType(Play.PROTOCOL, Server.SENDER, 18, 255, new String[] { "Commands" });
-                TRANSACTION = new PacketType(Play.PROTOCOL, Server.SENDER, 19, 255, new String[] { "Transaction" });
-                CLOSE_WINDOW = new PacketType(Play.PROTOCOL, Server.SENDER, 20, 255, new String[] { "CloseWindow" });
-                WINDOW_ITEMS = new PacketType(Play.PROTOCOL, Server.SENDER, 21, 255, new String[] { "WindowItems" });
-                WINDOW_DATA = new PacketType(Play.PROTOCOL, Server.SENDER, 22, 255, new String[] { "WindowData" });
-                SET_SLOT = new PacketType(Play.PROTOCOL, Server.SENDER, 23, 255, new String[] { "SetSlot" });
-                SET_COOLDOWN = new PacketType(Play.PROTOCOL, Server.SENDER, 24, 255, new String[] { "SetCooldown" });
-                CUSTOM_PAYLOAD = new PacketType(Play.PROTOCOL, Server.SENDER, 25, 255, new String[] { "CustomPayload" });
-                CUSTOM_SOUND_EFFECT = new PacketType(Play.PROTOCOL, Server.SENDER, 26, 255, new String[] { "CustomSoundEffect" });
-                KICK_DISCONNECT = new PacketType(Play.PROTOCOL, Server.SENDER, 27, 255, new String[] { "KickDisconnect" });
-                ENTITY_STATUS = new PacketType(Play.PROTOCOL, Server.SENDER, 28, 255, new String[] { "EntityStatus" });
-                EXPLOSION = new PacketType(Play.PROTOCOL, Server.SENDER, 29, 255, new String[] { "Explosion" });
-                UNLOAD_CHUNK = new PacketType(Play.PROTOCOL, Server.SENDER, 30, 255, new String[] { "UnloadChunk" });
-                GAME_STATE_CHANGE = new PacketType(Play.PROTOCOL, Server.SENDER, 31, 255, new String[] { "GameStateChange" });
-                OPEN_WINDOW_HORSE = new PacketType(Play.PROTOCOL, Server.SENDER, 32, 255, new String[] { "OpenWindowHorse" });
-                KEEP_ALIVE = new PacketType(Play.PROTOCOL, Server.SENDER, 33, 255, new String[] { "KeepAlive" });
-                MAP_CHUNK = new PacketType(Play.PROTOCOL, Server.SENDER, 34, 255, new String[] { "MapChunk" });
-                WORLD_EVENT = new PacketType(Play.PROTOCOL, Server.SENDER, 35, 255, new String[] { "WorldEvent" });
-                WORLD_PARTICLES = new PacketType(Play.PROTOCOL, Server.SENDER, 36, 255, new String[] { "WorldParticles" });
-                LIGHT_UPDATE = new PacketType(Play.PROTOCOL, Server.SENDER, 37, 255, new String[] { "LightUpdate" });
-                LOGIN = new PacketType(Play.PROTOCOL, Server.SENDER, 38, 255, new String[] { "Login" });
-                MAP = new PacketType(Play.PROTOCOL, Server.SENDER, 39, 255, new String[] { "Map" });
-                OPEN_WINDOW_MERCHANT = new PacketType(Play.PROTOCOL, Server.SENDER, 40, 255, new String[] { "OpenWindowMerchant" });
-                REL_ENTITY_MOVE = new PacketType(Play.PROTOCOL, Server.SENDER, 41, 255, new String[] { "Entity$RelEntityMove" });
-                REL_ENTITY_MOVE_LOOK = new PacketType(Play.PROTOCOL, Server.SENDER, 42, 255, new String[] { "Entity$RelEntityMoveLook" });
-                ENTITY_LOOK = new PacketType(Play.PROTOCOL, Server.SENDER, 43, 255, new String[] { "Entity$EntityLook" });
-                ENTITY = new PacketType(Play.PROTOCOL, Server.SENDER, 44, 255, new String[] { "Entity" });
-                VEHICLE_MOVE = new PacketType(Play.PROTOCOL, Server.SENDER, 45, 255, new String[] { "VehicleMove" });
-                OPEN_BOOK = new PacketType(Play.PROTOCOL, Server.SENDER, 46, 255, new String[] { "OpenBook" });
-                OPEN_WINDOW = new PacketType(Play.PROTOCOL, Server.SENDER, 47, 255, new String[] { "OpenWindow" });
-                OPEN_SIGN_EDITOR = new PacketType(Play.PROTOCOL, Server.SENDER, 48, 255, new String[] { "OpenSignEditor" });
-                AUTO_RECIPE = new PacketType(Play.PROTOCOL, Server.SENDER, 49, 255, new String[] { "AutoRecipe" });
-                ABILITIES = new PacketType(Play.PROTOCOL, Server.SENDER, 50, 255, new String[] { "Abilities" });
-                COMBAT_EVENT = new PacketType(Play.PROTOCOL, Server.SENDER, 51, 255, new String[] { "CombatEvent" });
-                PLAYER_INFO = new PacketType(Play.PROTOCOL, Server.SENDER, 52, 255, new String[] { "PlayerInfo" });
-                LOOK_AT = new PacketType(Play.PROTOCOL, Server.SENDER, 53, 255, new String[] { "LookAt" });
-                POSITION = new PacketType(Play.PROTOCOL, Server.SENDER, 54, 255, new String[] { "Position" });
-                RECIPES = new PacketType(Play.PROTOCOL, Server.SENDER, 55, 255, new String[] { "Recipes" });
-                ENTITY_DESTROY = new PacketType(Play.PROTOCOL, Server.SENDER, 56, 255, new String[] { "EntityDestroy" });
-                REMOVE_ENTITY_EFFECT = new PacketType(Play.PROTOCOL, Server.SENDER, 57, 255, new String[] { "RemoveEntityEffect" });
-                RESOURCE_PACK_SEND = new PacketType(Play.PROTOCOL, Server.SENDER, 58, 255, new String[] { "ResourcePackSend" });
-                RESPAWN = new PacketType(Play.PROTOCOL, Server.SENDER, 59, 255, new String[] { "Respawn" });
-                ENTITY_HEAD_ROTATION = new PacketType(Play.PROTOCOL, Server.SENDER, 60, 255, new String[] { "EntityHeadRotation" });
-                SELECT_ADVANCEMENT_TAB = new PacketType(Play.PROTOCOL, Server.SENDER, 61, 255, new String[] { "SelectAdvancementTab" });
-                WORLD_BORDER = new PacketType(Play.PROTOCOL, Server.SENDER, 62, 255, new String[] { "WorldBorder" });
-                CAMERA = new PacketType(Play.PROTOCOL, Server.SENDER, 63, 255, new String[] { "Camera" });
-                HELD_ITEM_SLOT = new PacketType(Play.PROTOCOL, Server.SENDER, 64, 255, new String[] { "HeldItemSlot" });
-                VIEW_CENTRE = new PacketType(Play.PROTOCOL, Server.SENDER, 65, 255, new String[] { "ViewCentre" });
-                VIEW_DISTANCE = new PacketType(Play.PROTOCOL, Server.SENDER, 66, 255, new String[] { "ViewDistance" });
-                SCOREBOARD_DISPLAY_OBJECTIVE = new PacketType(Play.PROTOCOL, Server.SENDER, 67, 255, new String[] { "ScoreboardDisplayObjective" });
-                ENTITY_METADATA = new PacketType(Play.PROTOCOL, Server.SENDER, 68, 255, new String[] { "EntityMetadata" });
-                ATTACH_ENTITY = new PacketType(Play.PROTOCOL, Server.SENDER, 69, 255, new String[] { "AttachEntity" });
-                ENTITY_VELOCITY = new PacketType(Play.PROTOCOL, Server.SENDER, 70, 255, new String[] { "EntityVelocity" });
-                ENTITY_EQUIPMENT = new PacketType(Play.PROTOCOL, Server.SENDER, 71, 255, new String[] { "EntityEquipment" });
-                EXPERIENCE = new PacketType(Play.PROTOCOL, Server.SENDER, 72, 255, new String[] { "Experience" });
-                UPDATE_HEALTH = new PacketType(Play.PROTOCOL, Server.SENDER, 73, 255, new String[] { "UpdateHealth" });
-                SCOREBOARD_OBJECTIVE = new PacketType(Play.PROTOCOL, Server.SENDER, 74, 255, new String[] { "ScoreboardObjective" });
-                MOUNT = new PacketType(Play.PROTOCOL, Server.SENDER, 75, 255, new String[] { "Mount" });
-                SCOREBOARD_TEAM = new PacketType(Play.PROTOCOL, Server.SENDER, 76, 255, new String[] { "ScoreboardTeam" });
-                SCOREBOARD_SCORE = new PacketType(Play.PROTOCOL, Server.SENDER, 77, 255, new String[] { "ScoreboardScore" });
-                SPAWN_POSITION = new PacketType(Play.PROTOCOL, Server.SENDER, 78, 255, new String[] { "SpawnPosition" });
-                UPDATE_TIME = new PacketType(Play.PROTOCOL, Server.SENDER, 79, 255, new String[] { "UpdateTime" });
-                TITLE = new PacketType(Play.PROTOCOL, Server.SENDER, 80, 255, new String[] { "Title" });
-                ENTITY_SOUND = new PacketType(Play.PROTOCOL, Server.SENDER, 81, 255, new String[] { "EntitySound" });
-                NAMED_SOUND_EFFECT = new PacketType(Play.PROTOCOL, Server.SENDER, 82, 255, new String[] { "NamedSoundEffect" });
-                STOP_SOUND = new PacketType(Play.PROTOCOL, Server.SENDER, 83, 255, new String[] { "StopSound" });
-                PLAYER_LIST_HEADER_FOOTER = new PacketType(Play.PROTOCOL, Server.SENDER, 84, 255, new String[] { "PlayerListHeaderFooter" });
-                NBT_QUERY = new PacketType(Play.PROTOCOL, Server.SENDER, 85, 255, new String[] { "NBTQuery" });
-                COLLECT = new PacketType(Play.PROTOCOL, Server.SENDER, 86, 255, new String[] { "Collect" });
-                ENTITY_TELEPORT = new PacketType(Play.PROTOCOL, Server.SENDER, 87, 255, new String[] { "EntityTeleport" });
-                ADVANCEMENTS = new PacketType(Play.PROTOCOL, Server.SENDER, 88, 255, new String[] { "Advancements" });
-                UPDATE_ATTRIBUTES = new PacketType(Play.PROTOCOL, Server.SENDER, 89, 255, new String[] { "UpdateAttributes" });
-                ENTITY_EFFECT = new PacketType(Play.PROTOCOL, Server.SENDER, 90, 255, new String[] { "EntityEffect" });
-                RECIPE_UPDATE = new PacketType(Play.PROTOCOL, Server.SENDER, 91, 255, new String[] { "RecipeUpdate" });
-                TAGS = new PacketType(Play.PROTOCOL, Server.SENDER, 92, 255, new String[] { "Tags" });
+                SPAWN_ENTITY = new PacketType(Play.PROTOCOL, Server.SENDER, 0, 0, new String[] { "SpawnEntity" });
+                SPAWN_ENTITY_EXPERIENCE_ORB = new PacketType(Play.PROTOCOL, Server.SENDER, 1, 1, new String[] { "SpawnEntityExperienceOrb" });
+                SPAWN_ENTITY_WEATHER = new PacketType(Play.PROTOCOL, Server.SENDER, 2, 2, new String[] { "SpawnEntityWeather" });
+                SPAWN_ENTITY_LIVING = new PacketType(Play.PROTOCOL, Server.SENDER, 3, 3, new String[] { "SpawnEntityLiving" });
+                SPAWN_ENTITY_PAINTING = new PacketType(Play.PROTOCOL, Server.SENDER, 4, 4, new String[] { "SpawnEntityPainting" });
+                NAMED_ENTITY_SPAWN = new PacketType(Play.PROTOCOL, Server.SENDER, 5, 5, new String[] { "NamedEntitySpawn" });
+                ANIMATION = new PacketType(Play.PROTOCOL, Server.SENDER, 6, 6, new String[] { "Animation" });
+                STATISTIC = new PacketType(Play.PROTOCOL, Server.SENDER, 7, 7, new String[] { "Statistic" });
+                BLOCK_BREAK_ANIMATION = new PacketType(Play.PROTOCOL, Server.SENDER, 8, 8, new String[] { "BlockBreakAnimation" });
+                TILE_ENTITY_DATA = new PacketType(Play.PROTOCOL, Server.SENDER, 9, 9, new String[] { "TileEntityData" });
+                BLOCK_ACTION = new PacketType(Play.PROTOCOL, Server.SENDER, 10, 10, new String[] { "BlockAction" });
+                BLOCK_CHANGE = new PacketType(Play.PROTOCOL, Server.SENDER, 11, 11, new String[] { "BlockChange" });
+                BOSS = new PacketType(Play.PROTOCOL, Server.SENDER, 12, 12, new String[] { "Boss" });
+                SERVER_DIFFICULTY = new PacketType(Play.PROTOCOL, Server.SENDER, 13, 13, new String[] { "ServerDifficulty" });
+                TAB_COMPLETE = new PacketType(Play.PROTOCOL, Server.SENDER, 14, 14, new String[] { "TabComplete" });
+                CHAT = new PacketType(Play.PROTOCOL, Server.SENDER, 15, 15, new String[] { "Chat" });
+                MULTI_BLOCK_CHANGE = new PacketType(Play.PROTOCOL, Server.SENDER, 16, 16, new String[] { "MultiBlockChange" });
+                TRANSACTION = new PacketType(Play.PROTOCOL, Server.SENDER, 17, 17, new String[] { "Transaction" });
+                CLOSE_WINDOW = new PacketType(Play.PROTOCOL, Server.SENDER, 18, 18, new String[] { "CloseWindow" });
+                OPEN_WINDOW = new PacketType(Play.PROTOCOL, Server.SENDER, 19, 19, new String[] { "OpenWindow" });
+                WINDOW_ITEMS = new PacketType(Play.PROTOCOL, Server.SENDER, 20, 20, new String[] { "WindowItems" });
+                WINDOW_DATA = new PacketType(Play.PROTOCOL, Server.SENDER, 21, 21, new String[] { "WindowData" });
+                SET_SLOT = new PacketType(Play.PROTOCOL, Server.SENDER, 22, 22, new String[] { "SetSlot" });
+                SET_COOLDOWN = new PacketType(Play.PROTOCOL, Server.SENDER, 23, 23, new String[] { "SetCooldown" });
+                CUSTOM_PAYLOAD = new PacketType(Play.PROTOCOL, Server.SENDER, 24, 24, new String[] { "CustomPayload" });
+                CUSTOM_SOUND_EFFECT = new PacketType(Play.PROTOCOL, Server.SENDER, 25, 25, new String[] { "CustomSoundEffect" });
+                KICK_DISCONNECT = new PacketType(Play.PROTOCOL, Server.SENDER, 26, 26, new String[] { "KickDisconnect" });
+                ENTITY_STATUS = new PacketType(Play.PROTOCOL, Server.SENDER, 27, 27, new String[] { "EntityStatus" });
+                EXPLOSION = new PacketType(Play.PROTOCOL, Server.SENDER, 28, 28, new String[] { "Explosion" });
+                UNLOAD_CHUNK = new PacketType(Play.PROTOCOL, Server.SENDER, 29, 29, new String[] { "UnloadChunk" });
+                GAME_STATE_CHANGE = new PacketType(Play.PROTOCOL, Server.SENDER, 30, 30, new String[] { "GameStateChange" });
+                KEEP_ALIVE = new PacketType(Play.PROTOCOL, Server.SENDER, 31, 31, new String[] { "KeepAlive" });
+                MAP_CHUNK = new PacketType(Play.PROTOCOL, Server.SENDER, 32, 32, new String[] { "MapChunk" });
+                WORLD_EVENT = new PacketType(Play.PROTOCOL, Server.SENDER, 33, 33, new String[] { "WorldEvent" });
+                WORLD_PARTICLES = new PacketType(Play.PROTOCOL, Server.SENDER, 34, 34, new String[] { "WorldParticles" });
+                LOGIN = new PacketType(Play.PROTOCOL, Server.SENDER, 35, 35, new String[] { "Login" });
+                MAP = new PacketType(Play.PROTOCOL, Server.SENDER, 36, 36, new String[] { "Map" });
+                ENTITY = new PacketType(Play.PROTOCOL, Server.SENDER, 37, 37, new String[] { "Entity" });
+                REL_ENTITY_MOVE = new PacketType(Play.PROTOCOL, Server.SENDER, 38, 38, new String[] { "RelEntityMove" });
+                REL_ENTITY_MOVE_LOOK = new PacketType(Play.PROTOCOL, Server.SENDER, 39, 39, new String[] { "RelEntityMoveLook" });
+                ENTITY_LOOK = new PacketType(Play.PROTOCOL, Server.SENDER, 40, 40, new String[] { "EntityLook" });
+                VEHICLE_MOVE = new PacketType(Play.PROTOCOL, Server.SENDER, 41, 41, new String[] { "VehicleMove" });
+                OPEN_SIGN_EDITOR = new PacketType(Play.PROTOCOL, Server.SENDER, 42, 42, new String[] { "OpenSignEditor" });
+                AUTO_RECIPE = new PacketType(Play.PROTOCOL, Server.SENDER, 43, -1, new String[] { "AutoRecipe" });
+                ABILITIES = new PacketType(Play.PROTOCOL, Server.SENDER, 44, 43, new String[] { "Abilities" });
+                COMBAT_EVENT = new PacketType(Play.PROTOCOL, Server.SENDER, 45, 44, new String[] { "CombatEvent" });
+                PLAYER_INFO = new PacketType(Play.PROTOCOL, Server.SENDER, 46, 45, new String[] { "PlayerInfo" });
+                POSITION = new PacketType(Play.PROTOCOL, Server.SENDER, 47, 46, new String[] { "Position" });
+                BED = new PacketType(Play.PROTOCOL, Server.SENDER, 48, 47, new String[] { "Bed" });
+                RECIPES = new PacketType(Play.PROTOCOL, Server.SENDER, 49, 48, new String[] { "Recipes" });
+                ENTITY_DESTROY = new PacketType(Play.PROTOCOL, Server.SENDER, 50, 49, new String[] { "EntityDestroy" });
+                REMOVE_ENTITY_EFFECT = new PacketType(Play.PROTOCOL, Server.SENDER, 51, 50, new String[] { "RemoveEntityEffect" });
+                RESOURCE_PACK_SEND = new PacketType(Play.PROTOCOL, Server.SENDER, 52, 51, new String[] { "ResourcePackSend" });
+                RESPAWN = new PacketType(Play.PROTOCOL, Server.SENDER, 53, 52, new String[] { "Respawn" });
+                ENTITY_HEAD_ROTATION = new PacketType(Play.PROTOCOL, Server.SENDER, 54, 53, new String[] { "EntityHeadRotation" });
+                SELECT_ADVANCEMENT_TAB = new PacketType(Play.PROTOCOL, Server.SENDER, 55, 54, new String[] { "SelectAdvancementTab" });
+                WORLD_BORDER = new PacketType(Play.PROTOCOL, Server.SENDER, 56, 55, new String[] { "WorldBorder" });
+                CAMERA = new PacketType(Play.PROTOCOL, Server.SENDER, 57, 56, new String[] { "Camera" });
+                HELD_ITEM_SLOT = new PacketType(Play.PROTOCOL, Server.SENDER, 58, 57, new String[] { "HeldItemSlot" });
+                SCOREBOARD_DISPLAY_OBJECTIVE = new PacketType(Play.PROTOCOL, Server.SENDER, 59, 58, new String[] { "ScoreboardDisplayObjective" });
+                ENTITY_METADATA = new PacketType(Play.PROTOCOL, Server.SENDER, 60, 59, new String[] { "EntityMetadata" });
+                ATTACH_ENTITY = new PacketType(Play.PROTOCOL, Server.SENDER, 61, 60, new String[] { "AttachEntity" });
+                ENTITY_VELOCITY = new PacketType(Play.PROTOCOL, Server.SENDER, 62, 61, new String[] { "EntityVelocity" });
+                ENTITY_EQUIPMENT = new PacketType(Play.PROTOCOL, Server.SENDER, 63, 62, new String[] { "EntityEquipment" });
+                EXPERIENCE = new PacketType(Play.PROTOCOL, Server.SENDER, 64, 63, new String[] { "Experience" });
+                UPDATE_HEALTH = new PacketType(Play.PROTOCOL, Server.SENDER, 65, 64, new String[] { "UpdateHealth" });
+                SCOREBOARD_OBJECTIVE = new PacketType(Play.PROTOCOL, Server.SENDER, 66, 65, new String[] { "ScoreboardObjective" });
+                MOUNT = new PacketType(Play.PROTOCOL, Server.SENDER, 67, 66, new String[] { "Mount" });
+                SCOREBOARD_TEAM = new PacketType(Play.PROTOCOL, Server.SENDER, 68, 67, new String[] { "ScoreboardTeam" });
+                SCOREBOARD_SCORE = new PacketType(Play.PROTOCOL, Server.SENDER, 69, 68, new String[] { "ScoreboardScore" });
+                SPAWN_POSITION = new PacketType(Play.PROTOCOL, Server.SENDER, 70, 69, new String[] { "SpawnPosition" });
+                UPDATE_TIME = new PacketType(Play.PROTOCOL, Server.SENDER, 71, 70, new String[] { "UpdateTime" });
+                TITLE = new PacketType(Play.PROTOCOL, Server.SENDER, 72, 71, new String[] { "Title" });
+                NAMED_SOUND_EFFECT = new PacketType(Play.PROTOCOL, Server.SENDER, 73, 72, new String[] { "NamedSoundEffect" });
+                PLAYER_LIST_HEADER_FOOTER = new PacketType(Play.PROTOCOL, Server.SENDER, 74, 73, new String[] { "PlayerListHeaderFooter" });
+                COLLECT = new PacketType(Play.PROTOCOL, Server.SENDER, 75, 74, new String[] { "Collect" });
+                ENTITY_TELEPORT = new PacketType(Play.PROTOCOL, Server.SENDER, 76, 75, new String[] { "EntityTeleport" });
+                ADVANCEMENTS = new PacketType(Play.PROTOCOL, Server.SENDER, 77, 76, new String[] { "Advancements" });
+                UPDATE_ATTRIBUTES = new PacketType(Play.PROTOCOL, Server.SENDER, 78, 77, new String[] { "UpdateAttributes" });
+                ENTITY_EFFECT = new PacketType(Play.PROTOCOL, Server.SENDER, 79, 78, new String[] { "EntityEffect" });
                 MAP_CHUNK_BULK = new PacketType(Play.PROTOCOL, Server.SENDER, 255, 255, new String[] { "MapChunkBulk" });
                 SET_COMPRESSION = new PacketType(Play.PROTOCOL, Server.SENDER, 254, 254, new String[] { "SetCompression" });
                 UPDATE_ENTITY_NBT = new PacketType(Play.PROTOCOL, Server.SENDER, 253, 253, new String[] { "UpdateEntityNBT" });
@@ -697,8 +653,6 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
                 STATISTICS = Server.STATISTIC.clone();
                 OPEN_SIGN_ENTITY = Server.OPEN_SIGN_EDITOR.clone();
                 UPDATE_SIGN = (MinecraftReflection.signUpdateExists() ? new PacketType(Play.PROTOCOL, Server.SENDER, 252, 252, new String[] { "UpdateSign" }) : Server.TILE_ENTITY_DATA.clone());
-                BED = new PacketType(Play.PROTOCOL, Server.SENDER, 51, 51, new String[] { "Bed" });
-                USE_BED = Server.BED.clone();
                 INSTANCE = new Server();
             }
         }
@@ -707,46 +661,33 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
         {
             private static final Sender SENDER;
             public static final PacketType TELEPORT_ACCEPT;
-            public static final PacketType TILE_NBT_QUERY;
-            public static final PacketType DIFFICULTY_CHANGE;
+            public static final PacketType TAB_COMPLETE;
             public static final PacketType CHAT;
             public static final PacketType CLIENT_COMMAND;
             public static final PacketType SETTINGS;
-            public static final PacketType TAB_COMPLETE;
             public static final PacketType TRANSACTION;
             public static final PacketType ENCHANT_ITEM;
             public static final PacketType WINDOW_CLICK;
             public static final PacketType CLOSE_WINDOW;
             public static final PacketType CUSTOM_PAYLOAD;
-            public static final PacketType B_EDIT;
-            public static final PacketType ENTITY_NBT_QUERY;
             public static final PacketType USE_ENTITY;
             public static final PacketType KEEP_ALIVE;
-            public static final PacketType DIFFICULTY_LOCK;
+            public static final PacketType FLYING;
             public static final PacketType POSITION;
             public static final PacketType POSITION_LOOK;
             public static final PacketType LOOK;
-            public static final PacketType FLYING;
             public static final PacketType VEHICLE_MOVE;
             public static final PacketType BOAT_MOVE;
-            public static final PacketType PICK_ITEM;
             public static final PacketType AUTO_RECIPE;
             public static final PacketType ABILITIES;
             public static final PacketType BLOCK_DIG;
             public static final PacketType ENTITY_ACTION;
             public static final PacketType STEER_VEHICLE;
             public static final PacketType RECIPE_DISPLAYED;
-            public static final PacketType ITEM_NAME;
             public static final PacketType RESOURCE_PACK_STATUS;
             public static final PacketType ADVANCEMENTS;
-            public static final PacketType TR_SEL;
-            public static final PacketType BEACON;
             public static final PacketType HELD_ITEM_SLOT;
-            public static final PacketType SET_COMMAND_BLOCK;
-            public static final PacketType SET_COMMAND_MINECART;
             public static final PacketType SET_CREATIVE_SLOT;
-            public static final PacketType SET_JIGSAW;
-            public static final PacketType STRUCT;
             public static final PacketType UPDATE_SIGN;
             public static final PacketType ARM_ANIMATION;
             public static final PacketType SPECTATE;
@@ -767,52 +708,39 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             
             static {
                 SENDER = Sender.CLIENT;
-                TELEPORT_ACCEPT = new PacketType(Play.PROTOCOL, Client.SENDER, 0, 255, new String[] { "TeleportAccept" });
-                TILE_NBT_QUERY = new PacketType(Play.PROTOCOL, Client.SENDER, 1, 255, new String[] { "TileNBTQuery" });
-                DIFFICULTY_CHANGE = new PacketType(Play.PROTOCOL, Client.SENDER, 2, 255, new String[] { "DifficultyChange" });
-                CHAT = new PacketType(Play.PROTOCOL, Client.SENDER, 3, 255, new String[] { "Chat" });
-                CLIENT_COMMAND = new PacketType(Play.PROTOCOL, Client.SENDER, 4, 255, new String[] { "ClientCommand" });
-                SETTINGS = new PacketType(Play.PROTOCOL, Client.SENDER, 5, 255, new String[] { "Settings" });
-                TAB_COMPLETE = new PacketType(Play.PROTOCOL, Client.SENDER, 6, 255, new String[] { "TabComplete" });
-                TRANSACTION = new PacketType(Play.PROTOCOL, Client.SENDER, 7, 255, new String[] { "Transaction" });
-                ENCHANT_ITEM = new PacketType(Play.PROTOCOL, Client.SENDER, 8, 255, new String[] { "EnchantItem" });
-                WINDOW_CLICK = new PacketType(Play.PROTOCOL, Client.SENDER, 9, 255, new String[] { "WindowClick" });
-                CLOSE_WINDOW = new PacketType(Play.PROTOCOL, Client.SENDER, 10, 255, new String[] { "CloseWindow" });
-                CUSTOM_PAYLOAD = new PacketType(Play.PROTOCOL, Client.SENDER, 11, 255, new String[] { "CustomPayload" });
-                B_EDIT = new PacketType(Play.PROTOCOL, Client.SENDER, 12, 255, new String[] { "BEdit" });
-                ENTITY_NBT_QUERY = new PacketType(Play.PROTOCOL, Client.SENDER, 13, 255, new String[] { "EntityNBTQuery" });
-                USE_ENTITY = new PacketType(Play.PROTOCOL, Client.SENDER, 14, 255, new String[] { "UseEntity" });
-                KEEP_ALIVE = new PacketType(Play.PROTOCOL, Client.SENDER, 15, 255, new String[] { "KeepAlive" });
-                DIFFICULTY_LOCK = new PacketType(Play.PROTOCOL, Client.SENDER, 16, 255, new String[] { "DifficultyLock" });
-                POSITION = new PacketType(Play.PROTOCOL, Client.SENDER, 17, 255, new String[] { "Flying$Position" });
-                POSITION_LOOK = new PacketType(Play.PROTOCOL, Client.SENDER, 18, 255, new String[] { "Flying$PositionLook" });
-                LOOK = new PacketType(Play.PROTOCOL, Client.SENDER, 19, 255, new String[] { "Flying$Look" });
-                FLYING = new PacketType(Play.PROTOCOL, Client.SENDER, 20, 255, new String[] { "Flying" });
-                VEHICLE_MOVE = new PacketType(Play.PROTOCOL, Client.SENDER, 21, 255, new String[] { "VehicleMove" });
-                BOAT_MOVE = new PacketType(Play.PROTOCOL, Client.SENDER, 22, 255, new String[] { "BoatMove" });
-                PICK_ITEM = new PacketType(Play.PROTOCOL, Client.SENDER, 23, 255, new String[] { "PickItem" });
-                AUTO_RECIPE = new PacketType(Play.PROTOCOL, Client.SENDER, 24, 255, new String[] { "AutoRecipe" });
-                ABILITIES = new PacketType(Play.PROTOCOL, Client.SENDER, 25, 255, new String[] { "Abilities" });
-                BLOCK_DIG = new PacketType(Play.PROTOCOL, Client.SENDER, 26, 255, new String[] { "BlockDig" });
-                ENTITY_ACTION = new PacketType(Play.PROTOCOL, Client.SENDER, 27, 255, new String[] { "EntityAction" });
-                STEER_VEHICLE = new PacketType(Play.PROTOCOL, Client.SENDER, 28, 255, new String[] { "SteerVehicle" });
-                RECIPE_DISPLAYED = new PacketType(Play.PROTOCOL, Client.SENDER, 29, 255, new String[] { "RecipeDisplayed" });
-                ITEM_NAME = new PacketType(Play.PROTOCOL, Client.SENDER, 30, 255, new String[] { "ItemName" });
-                RESOURCE_PACK_STATUS = new PacketType(Play.PROTOCOL, Client.SENDER, 31, 255, new String[] { "ResourcePackStatus" });
-                ADVANCEMENTS = new PacketType(Play.PROTOCOL, Client.SENDER, 32, 255, new String[] { "Advancements" });
-                TR_SEL = new PacketType(Play.PROTOCOL, Client.SENDER, 33, 255, new String[] { "TrSel" });
-                BEACON = new PacketType(Play.PROTOCOL, Client.SENDER, 34, 255, new String[] { "Beacon" });
-                HELD_ITEM_SLOT = new PacketType(Play.PROTOCOL, Client.SENDER, 35, 255, new String[] { "HeldItemSlot" });
-                SET_COMMAND_BLOCK = new PacketType(Play.PROTOCOL, Client.SENDER, 36, 255, new String[] { "SetCommandBlock" });
-                SET_COMMAND_MINECART = new PacketType(Play.PROTOCOL, Client.SENDER, 37, 255, new String[] { "SetCommandMinecart" });
-                SET_CREATIVE_SLOT = new PacketType(Play.PROTOCOL, Client.SENDER, 38, 255, new String[] { "SetCreativeSlot" });
-                SET_JIGSAW = new PacketType(Play.PROTOCOL, Client.SENDER, 39, 255, new String[] { "SetJigsaw" });
-                STRUCT = new PacketType(Play.PROTOCOL, Client.SENDER, 40, 255, new String[] { "Struct" });
-                UPDATE_SIGN = new PacketType(Play.PROTOCOL, Client.SENDER, 41, 255, new String[] { "UpdateSign" });
-                ARM_ANIMATION = new PacketType(Play.PROTOCOL, Client.SENDER, 42, 255, new String[] { "ArmAnimation" });
-                SPECTATE = new PacketType(Play.PROTOCOL, Client.SENDER, 43, 255, new String[] { "Spectate" });
-                USE_ITEM = new PacketType(Play.PROTOCOL, Client.SENDER, 44, 255, new String[] { "UseItem" });
-                BLOCK_PLACE = new PacketType(Play.PROTOCOL, Client.SENDER, 45, 255, new String[] { "BlockPlace" });
+                TELEPORT_ACCEPT = new PacketType(Play.PROTOCOL, Client.SENDER, 0, 0, new String[] { "TeleportAccept" });
+                TAB_COMPLETE = new PacketType(Play.PROTOCOL, Client.SENDER, 1, 2, new String[] { "TabComplete" });
+                CHAT = new PacketType(Play.PROTOCOL, Client.SENDER, 2, 3, new String[] { "Chat" });
+                CLIENT_COMMAND = new PacketType(Play.PROTOCOL, Client.SENDER, 3, 4, new String[] { "ClientCommand" });
+                SETTINGS = new PacketType(Play.PROTOCOL, Client.SENDER, 4, 5, new String[] { "Settings" });
+                TRANSACTION = new PacketType(Play.PROTOCOL, Client.SENDER, 5, 6, new String[] { "Transaction" });
+                ENCHANT_ITEM = new PacketType(Play.PROTOCOL, Client.SENDER, 6, 7, new String[] { "EnchantItem" });
+                WINDOW_CLICK = new PacketType(Play.PROTOCOL, Client.SENDER, 7, 8, new String[] { "WindowClick" });
+                CLOSE_WINDOW = new PacketType(Play.PROTOCOL, Client.SENDER, 8, 9, new String[] { "CloseWindow" });
+                CUSTOM_PAYLOAD = new PacketType(Play.PROTOCOL, Client.SENDER, 9, 10, new String[] { "CustomPayload" });
+                USE_ENTITY = new PacketType(Play.PROTOCOL, Client.SENDER, 10, 11, new String[] { "UseEntity" });
+                KEEP_ALIVE = new PacketType(Play.PROTOCOL, Client.SENDER, 11, 12, new String[] { "KeepAlive" });
+                FLYING = new PacketType(Play.PROTOCOL, Client.SENDER, 12, 13, new String[] { "Flying" });
+                POSITION = new PacketType(Play.PROTOCOL, Client.SENDER, 13, 14, new String[] { "Position" });
+                POSITION_LOOK = new PacketType(Play.PROTOCOL, Client.SENDER, 14, 15, new String[] { "PositionLook" });
+                LOOK = new PacketType(Play.PROTOCOL, Client.SENDER, 15, 16, new String[] { "Look" });
+                VEHICLE_MOVE = new PacketType(Play.PROTOCOL, Client.SENDER, 16, 17, new String[] { "VehicleMove" });
+                BOAT_MOVE = new PacketType(Play.PROTOCOL, Client.SENDER, 17, 18, new String[] { "BoatMove" });
+                AUTO_RECIPE = new PacketType(Play.PROTOCOL, Client.SENDER, 18, 1, new String[] { "AutoRecipe" });
+                ABILITIES = new PacketType(Play.PROTOCOL, Client.SENDER, 19, 19, new String[] { "Abilities" });
+                BLOCK_DIG = new PacketType(Play.PROTOCOL, Client.SENDER, 20, 20, new String[] { "BlockDig" });
+                ENTITY_ACTION = new PacketType(Play.PROTOCOL, Client.SENDER, 21, 21, new String[] { "EntityAction" });
+                STEER_VEHICLE = new PacketType(Play.PROTOCOL, Client.SENDER, 22, 22, new String[] { "SteerVehicle" });
+                RECIPE_DISPLAYED = new PacketType(Play.PROTOCOL, Client.SENDER, 23, 23, new String[] { "RecipeDisplayed" });
+                RESOURCE_PACK_STATUS = new PacketType(Play.PROTOCOL, Client.SENDER, 24, 24, new String[] { "ResourcePackStatus" });
+                ADVANCEMENTS = new PacketType(Play.PROTOCOL, Client.SENDER, 25, 25, new String[] { "Advancements" });
+                HELD_ITEM_SLOT = new PacketType(Play.PROTOCOL, Client.SENDER, 26, 26, new String[] { "HeldItemSlot" });
+                SET_CREATIVE_SLOT = new PacketType(Play.PROTOCOL, Client.SENDER, 27, 27, new String[] { "SetCreativeSlot" });
+                UPDATE_SIGN = new PacketType(Play.PROTOCOL, Client.SENDER, 28, 28, new String[] { "UpdateSign" });
+                ARM_ANIMATION = new PacketType(Play.PROTOCOL, Client.SENDER, 29, 29, new String[] { "ArmAnimation" });
+                SPECTATE = new PacketType(Play.PROTOCOL, Client.SENDER, 30, 30, new String[] { "Spectate" });
+                USE_ITEM = new PacketType(Play.PROTOCOL, Client.SENDER, 31, 31, new String[] { "UseItem" });
+                BLOCK_PLACE = new PacketType(Play.PROTOCOL, Client.SENDER, 32, 32, new String[] { "BlockPlace" });
                 INSTANCE = new Client();
             }
         }
@@ -854,8 +782,8 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             
             static {
                 SENDER = Sender.SERVER;
-                SERVER_INFO = new PacketType(Status.PROTOCOL, Server.SENDER, 0, 255, new String[] { "ServerInfo" });
-                PONG = new PacketType(Status.PROTOCOL, Server.SENDER, 1, 255, new String[] { "Pong" });
+                SERVER_INFO = new PacketType(Status.PROTOCOL, Server.SENDER, 0, 0, new String[] { "ServerInfo" });
+                PONG = new PacketType(Status.PROTOCOL, Server.SENDER, 1, 1, new String[] { "Pong" });
                 OUT_SERVER_INFO = Server.SERVER_INFO.clone();
                 INSTANCE = new Server();
             }
@@ -881,8 +809,8 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             
             static {
                 SENDER = Sender.CLIENT;
-                START = new PacketType(Status.PROTOCOL, Client.SENDER, 0, 255, new String[] { "Start" });
-                PING = new PacketType(Status.PROTOCOL, Client.SENDER, 1, 255, new String[] { "Ping" });
+                START = new PacketType(Status.PROTOCOL, Client.SENDER, 0, 0, new String[] { "Start" });
+                PING = new PacketType(Status.PROTOCOL, Client.SENDER, 1, 1, new String[] { "Ping" });
                 INSTANCE = new Client();
             }
         }
@@ -907,7 +835,6 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             public static final PacketType ENCRYPTION_BEGIN;
             public static final PacketType SUCCESS;
             public static final PacketType SET_COMPRESSION;
-            public static final PacketType CUSTOM_PAYLOAD;
             private static final Server INSTANCE;
             
             private Server() {
@@ -923,11 +850,10 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             
             static {
                 SENDER = Sender.SERVER;
-                DISCONNECT = new PacketType(Login.PROTOCOL, Server.SENDER, 0, 255, new String[] { "Disconnect" });
-                ENCRYPTION_BEGIN = new PacketType(Login.PROTOCOL, Server.SENDER, 1, 255, new String[] { "EncryptionBegin" });
-                SUCCESS = new PacketType(Login.PROTOCOL, Server.SENDER, 2, 255, new String[] { "Success" });
-                SET_COMPRESSION = new PacketType(Login.PROTOCOL, Server.SENDER, 3, 255, new String[] { "SetCompression" });
-                CUSTOM_PAYLOAD = new PacketType(Login.PROTOCOL, Server.SENDER, 4, 255, new String[] { "CustomPayload" });
+                DISCONNECT = new PacketType(Login.PROTOCOL, Server.SENDER, 0, 0, new String[] { "Disconnect" });
+                ENCRYPTION_BEGIN = new PacketType(Login.PROTOCOL, Server.SENDER, 1, 1, new String[] { "EncryptionBegin" });
+                SUCCESS = new PacketType(Login.PROTOCOL, Server.SENDER, 2, 2, new String[] { "Success" });
+                SET_COMPRESSION = new PacketType(Login.PROTOCOL, Server.SENDER, 3, 3, new String[] { "SetCompression" });
                 INSTANCE = new Server();
             }
         }
@@ -937,7 +863,6 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             private static final Sender SENDER;
             public static final PacketType START;
             public static final PacketType ENCRYPTION_BEGIN;
-            public static final PacketType CUSTOM_PAYLOAD;
             private static final Client INSTANCE;
             
             private Client() {
@@ -953,9 +878,8 @@ public class PacketType implements Serializable, Cloneable, Comparable<PacketTyp
             
             static {
                 SENDER = Sender.CLIENT;
-                START = new PacketType(Login.PROTOCOL, Client.SENDER, 0, 255, new String[] { "Start" });
-                ENCRYPTION_BEGIN = new PacketType(Login.PROTOCOL, Client.SENDER, 1, 255, new String[] { "EncryptionBegin" });
-                CUSTOM_PAYLOAD = new PacketType(Login.PROTOCOL, Client.SENDER, 2, 255, new String[] { "CustomPayload" });
+                START = new PacketType(Login.PROTOCOL, Client.SENDER, 0, 0, new String[] { "Start" });
+                ENCRYPTION_BEGIN = new PacketType(Login.PROTOCOL, Client.SENDER, 1, 1, new String[] { "EncryptionBegin" });
                 INSTANCE = new Client();
             }
         }

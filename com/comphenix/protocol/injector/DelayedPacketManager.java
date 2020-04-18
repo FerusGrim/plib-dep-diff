@@ -396,7 +396,7 @@ public class DelayedPacketManager implements InternalManager
             this.delegate.updateEntity(entity, observers);
         }
         else {
-            EntityUtilities.getInstance().updateEntity(entity, observers);
+            EntityUtilities.updateEntity(entity, observers);
         }
     }
     
@@ -405,7 +405,7 @@ public class DelayedPacketManager implements InternalManager
         if (this.delegate != null) {
             return this.delegate.getEntityFromID(container, id);
         }
-        return EntityUtilities.getInstance().getEntityFromID(container, id);
+        return EntityUtilities.getEntityFromID(container, id);
     }
     
     @Override
@@ -413,7 +413,7 @@ public class DelayedPacketManager implements InternalManager
         if (this.delegate != null) {
             return this.delegate.getEntityTrackers(entity);
         }
-        return EntityUtilities.getInstance().getEntityTrackers(entity);
+        return EntityUtilities.getEntityTrackers(entity);
     }
     
     @Override

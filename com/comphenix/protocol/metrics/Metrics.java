@@ -9,11 +9,12 @@ import java.io.DataOutputStream;
 import java.net.URL;
 import javax.net.ssl.HttpsURLConnection;
 import java.util.logging.Level;
+import java.lang.reflect.InvocationTargetException;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import java.lang.reflect.Method;
 import org.bukkit.entity.Player;
 import java.util.Collection;
-import org.bukkit.craftbukkit.libs.org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import java.util.TimerTask;
@@ -166,10 +167,13 @@ public class Metrics
                     try {
                         pluginData.add(provider.getService().getMethod("getPluginData", (Class[])new Class[0]).invoke(provider.getProvider(), new Object[0]));
                     }
-                    catch (Exception ex) {}
+                    catch (NullPointerException ex) {}
+                    catch (NoSuchMethodException ex2) {}
+                    catch (IllegalAccessException ex3) {}
+                    catch (InvocationTargetException ex4) {}
                 }
             }
-            catch (Exception ex2) {}
+            catch (NoSuchFieldException ex5) {}
         }
         data.put((Object)"plugins", (Object)pluginData);
         new Thread(new Runnable() {

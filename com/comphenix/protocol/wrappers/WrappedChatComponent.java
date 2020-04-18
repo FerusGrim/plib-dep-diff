@@ -9,7 +9,7 @@ import java.io.StringReader;
 import com.comphenix.protocol.reflect.accessors.ConstructorAccessor;
 import com.comphenix.protocol.reflect.accessors.MethodAccessor;
 
-public class WrappedChatComponent extends AbstractWrapper implements ClonableWrapper
+public class WrappedChatComponent extends AbstractWrapper
 {
     private static final Class<?> SERIALIZER;
     private static final Class<?> COMPONENT;
@@ -69,7 +69,6 @@ public class WrappedChatComponent extends AbstractWrapper implements ClonableWra
         this.cache = obj;
     }
     
-    @Override
     public WrappedChatComponent deepClone() {
         return fromJson(this.getJson());
     }

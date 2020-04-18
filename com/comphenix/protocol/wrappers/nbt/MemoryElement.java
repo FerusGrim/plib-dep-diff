@@ -1,7 +1,5 @@
 package com.comphenix.protocol.wrappers.nbt;
 
-import com.comphenix.protocol.wrappers.ClonableWrapper;
-
 class MemoryElement<TType> implements NbtBase<TType>
 {
     private String name;

@@ -3,9 +3,8 @@ package com.comphenix.protocol.wrappers;
 import com.comphenix.protocol.reflect.accessors.Accessors;
 import com.comphenix.protocol.reflect.FuzzyReflection;
 import com.comphenix.protocol.utility.MinecraftReflection;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
-import java.util.function.Function;
+import com.google.common.collect.Iterables;
+import com.google.common.base.Function;
 import java.util.Map;
 import com.comphenix.protocol.reflect.accessors.FieldAccessor;
 import com.comphenix.protocol.reflect.accessors.MethodAccessor;
@@ -14,9 +13,9 @@ public class WrappedStatistic extends AbstractWrapper
 {
     private static final Class<?> STATISTIC;
     private static final Class<?> STATISTIC_LIST;
-    private static MethodAccessor FIND_STATISTICS;
-    private static FieldAccessor MAP_ACCESSOR;
-    private static FieldAccessor GET_NAME;
+    private static final MethodAccessor FIND_STATISTICS;
+    private static final FieldAccessor MAP_ACCESSOR;
+    private static final FieldAccessor GET_NAME;
     private final String name;
     
     private WrappedStatistic(final Object handle) {
@@ -36,7 +35,11 @@ public class WrappedStatistic extends AbstractWrapper
     
     public static Iterable<WrappedStatistic> values() {
         final Map<Object, Object> map = (Map<Object, Object>)WrappedStatistic.MAP_ACCESSOR.get(null);
-        return map.values().stream().map((Function<? super Object, ?>)WrappedStatistic::fromHandle).collect((Collector<? super Object, ?, Iterable<WrappedStatistic>>)Collectors.toList());
+        return (Iterable<WrappedStatistic>)Iterables.transform((Iterable)map.values(), (Function)new Function<Object, WrappedStatistic>() {
+            public WrappedStatistic apply(final Object handle) {
+                return WrappedStatistic.fromHandle(handle);
+            }
+        });
     }
     
     public String getName() {
@@ -51,11 +54,8 @@ public class WrappedStatistic extends AbstractWrapper
     static {
         STATISTIC = MinecraftReflection.getStatisticClass();
         STATISTIC_LIST = MinecraftReflection.getStatisticListClass();
-        try {
-            WrappedStatistic.FIND_STATISTICS = Accessors.getMethodAccessor(FuzzyReflection.fromClass(WrappedStatistic.STATISTIC_LIST).getMethodByParameters("findStatistic", WrappedStatistic.STATISTIC, new Class[] { String.class }));
-            WrappedStatistic.MAP_ACCESSOR = Accessors.getFieldAccessor(WrappedStatistic.STATISTIC_LIST, Map.class, true);
-            WrappedStatistic.GET_NAME = Accessors.getFieldAccessor(WrappedStatistic.STATISTIC, String.class, true);
-        }
-        catch (Exception ex) {}
+        FIND_STATISTICS = Accessors.getMethodAccessor(FuzzyReflection.fromClass(WrappedStatistic.STATISTIC_LIST).getMethodByParameters("findStatistic", WrappedStatistic.STATISTIC, new Class[] { String.class }));
+        MAP_ACCESSOR = Accessors.getFieldAccessor(WrappedStatistic.STATISTIC_LIST, Map.class, true);
+        GET_NAME = Accessors.getFieldAccessor(WrappedStatistic.STATISTIC, String.class, true);
     }
 }

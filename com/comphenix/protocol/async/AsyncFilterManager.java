@@ -211,7 +211,7 @@ public class AsyncFilterManager implements AsynchronousManager
             throw new IllegalArgumentException("Cannot queue a packet that has already been queued.");
         }
         asyncMarker.setQueuedSendingIndex(asyncMarker.getNewSendingIndex());
-        final Player player = syncPacket.getPlayer();
+        final Player player = newEvent.getPlayer();
         if (player != null) {
             this.getSendingQueue(syncPacket).enqueue(newEvent);
             this.getProcessingQueue(syncPacket).enqueue(newEvent, true);

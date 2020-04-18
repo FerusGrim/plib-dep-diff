@@ -2,10 +2,8 @@ package com.comphenix.protocol.reflect.cloning;
 
 import java.lang.reflect.Constructor;
 import java.io.Serializable;
-import java.lang.reflect.Method;
 import java.util.Iterator;
 import java.lang.reflect.Array;
-import com.google.common.collect.BiMap;
 import java.util.Map;
 import java.util.Collection;
 
@@ -32,66 +30,47 @@ public class CollectionCloner implements Cloner
             throw new IllegalArgumentException("source cannot be NULL.");
         }
         final Class<?> clazz = source.getClass();
-        try {
-            if (source instanceof Collection) {
-                final Collection<Object> copy = this.cloneConstructor(Collection.class, clazz, source);
-                try {
-                    copy.clear();
-                    for (final Object element : (Collection)source) {
-                        copy.add(this.getClone(element, source));
-                    }
+        if (source instanceof Collection) {
+            final Collection<Object> copy = this.cloneConstructor(Collection.class, clazz, source);
+            try {
+                copy.clear();
+                for (final Object element : (Collection)source) {
+                    copy.add(this.getClone(element, source));
                 }
-                catch (UnsupportedOperationException ex2) {}
-                return copy;
             }
-            if (source instanceof Map) {
-                Map<Object, Object> copy2;
-                if (source instanceof BiMap) {
-                    final BiMap original = (BiMap)source;
-                    if (clazz.getDeclaringClass() != null) {
-                        final Method create = clazz.getDeclaringClass().getMethod("create", Integer.TYPE);
-                        copy2 = (Map<Object, Object>)((BiMap)create.invoke(null, original.size())).inverse();
-                    }
-                    else {
-                        final Method create = clazz.getMethod("create", Integer.TYPE);
-                        copy2 = (Map<Object, Object>)create.invoke(null, original.size());
-                    }
-                }
-                else {
-                    copy2 = this.cloneConstructor(Map.class, clazz, source);
-                }
-                try {
-                    copy2.clear();
-                    for (final Map.Entry<Object, Object> element2 : ((Map)source).entrySet()) {
-                        final Object key = this.getClone(element2.getKey(), source);
-                        final Object value = this.getClone(element2.getValue(), source);
-                        copy2.put(key, value);
-                    }
-                }
-                catch (UnsupportedOperationException ex3) {}
-                return copy2;
-            }
-            if (clazz.isArray()) {
-                final int length = Array.getLength(source);
-                final Class<?> component = clazz.getComponentType();
-                if (ImmutableDetector.isImmutable(component)) {
-                    return this.clonePrimitive(component, source);
-                }
-                final Object copy3 = Array.newInstance(clazz.getComponentType(), length);
-                for (int i = 0; i < length; ++i) {
-                    final Object element3 = Array.get(source, i);
-                    if (!this.defaultCloner.canClone(element3)) {
-                        throw new IllegalArgumentException("Cannot clone " + element3 + " in array " + source);
-                    }
-                    Array.set(copy3, i, this.defaultCloner.clone(element3));
-                }
-                return copy3;
-            }
+            catch (UnsupportedOperationException ex) {}
+            return copy;
         }
-        catch (Exception ex) {
-            throw new RuntimeException("Failed to clone " + source + " (" + source.getClass() + ")", ex);
+        if (source instanceof Map) {
+            final Map<Object, Object> copy2 = this.cloneConstructor(Map.class, clazz, source);
+            try {
+                copy2.clear();
+                for (final Map.Entry<Object, Object> element2 : ((Map)source).entrySet()) {
+                    final Object key = this.getClone(element2.getKey(), source);
+                    final Object value = this.getClone(element2.getValue(), source);
+                    copy2.put(key, value);
+                }
+            }
+            catch (UnsupportedOperationException ex2) {}
+            return copy2;
         }
-        throw new IllegalArgumentException(source + " is not an array nor a Collection.");
+        if (!clazz.isArray()) {
+            throw new IllegalArgumentException(source + " is not an array nor a Collection.");
+        }
+        final int lenght = Array.getLength(source);
+        final Class<?> component = clazz.getComponentType();
+        if (ImmutableDetector.isImmutable(component)) {
+            return this.clonePrimitive(component, source);
+        }
+        final Object copy3 = Array.newInstance(clazz.getComponentType(), lenght);
+        for (int i = 0; i < lenght; ++i) {
+            final Object element3 = Array.get(source, i);
+            if (!this.defaultCloner.canClone(element3)) {
+                throw new IllegalArgumentException("Cannot clone " + element3 + " in array " + source);
+            }
+            Array.set(copy3, i, this.defaultCloner.clone(element3));
+        }
+        return copy3;
     }
     
     private Object getClone(final Object element, final Object container) {
@@ -131,7 +110,7 @@ public class CollectionCloner implements Cloner
     
     private <T> T cloneConstructor(final Class<?> superclass, final Class<?> clazz, final Object source) {
         try {
-            final Constructor<?> constructCopy = clazz.getConstructor(superclass);
+            final Constructor<?> constructCopy = clazz.getConstructor(Collection.class);
             return (T)constructCopy.newInstance(source);
         }
         catch (NoSuchMethodException e2) {

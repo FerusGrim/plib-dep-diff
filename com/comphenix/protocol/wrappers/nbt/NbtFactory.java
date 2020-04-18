@@ -1,13 +1,7 @@
 package com.comphenix.protocol.wrappers.nbt;
 
-import java.util.concurrent.ConcurrentHashMap;
-import com.comphenix.protocol.reflect.instances.DefaultInstances;
-import com.comphenix.protocol.reflect.MethodInfo;
-import com.comphenix.protocol.reflect.fuzzy.AbstractFuzzyMatcher;
-import com.comphenix.protocol.reflect.fuzzy.FuzzyMethodContract;
 import com.comphenix.protocol.reflect.FuzzyReflection;
 import com.comphenix.protocol.reflect.FieldAccessException;
-import com.comphenix.protocol.utility.MinecraftVersion;
 import java.util.Collection;
 import javax.annotation.Nonnull;
 import com.comphenix.protocol.wrappers.BukkitConverters;
@@ -21,17 +15,18 @@ import java.io.OutputStream;
 import java.util.zip.GZIPOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.Closeable;
+import com.google.common.io.Closeables;
 import java.io.DataInput;
-import com.comphenix.protocol.wrappers.nbt.io.NbtBinarySerializer;
 import java.io.DataInputStream;
 import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
+import com.comphenix.protocol.wrappers.nbt.io.NbtBinarySerializer;
 import java.io.FileInputStream;
 import com.google.common.base.Preconditions;
 import java.util.Optional;
 import org.bukkit.inventory.ItemStack;
 import java.util.List;
-import java.lang.reflect.Constructor;
 import java.util.Map;
 import com.comphenix.protocol.reflect.StructureModifier;
 import java.lang.reflect.Method;
@@ -41,8 +36,6 @@ public class NbtFactory
     private static Method methodCreateTag;
     private static boolean methodCreateWithName;
     private static StructureModifier<Object> itemStackModifier;
-    private static Method getTagType;
-    private static final Map<NbtType, Constructor<?>> CONSTRUCTORS;
     
     public static NbtCompound asCompound(final NbtBase<?> tag) {
         if (tag instanceof NbtCompound) {
@@ -113,18 +106,43 @@ public class NbtFactory
     
     public static NbtCompound fromFile(final String file) throws IOException {
         Preconditions.checkNotNull((Object)file, (Object)"file cannot be NULL");
-        try (final FileInputStream stream = new FileInputStream(file);
-             final DataInputStream input = new DataInputStream(new GZIPInputStream(stream))) {
-            return NbtBinarySerializer.DEFAULT.deserializeCompound(input);
+        FileInputStream stream = null;
+        DataInputStream input = null;
+        boolean swallow = true;
+        try {
+            stream = new FileInputStream(file);
+            final NbtCompound result = NbtBinarySerializer.DEFAULT.deserializeCompound(input = new DataInputStream(new GZIPInputStream(stream)));
+            swallow = false;
+            return result;
+        }
+        finally {
+            if (input != null) {
+                Closeables.close((Closeable)input, swallow);
+            }
+            else if (stream != null) {
+                Closeables.close((Closeable)stream, swallow);
+            }
         }
     }
     
     public static void toFile(final NbtCompound compound, final String file) throws IOException {
         Preconditions.checkNotNull((Object)compound, (Object)"compound cannot be NULL");
         Preconditions.checkNotNull((Object)file, (Object)"file cannot be NULL");
-        try (final FileOutputStream stream = new FileOutputStream(file);
-             final DataOutputStream output = new DataOutputStream(new GZIPOutputStream(stream))) {
-            NbtBinarySerializer.DEFAULT.serialize((NbtBase<Object>)compound, output);
+        FileOutputStream stream = null;
+        DataOutputStream output = null;
+        boolean swallow = true;
+        try {
+            stream = new FileOutputStream(file);
+            NbtBinarySerializer.DEFAULT.serialize((NbtBase<Object>)compound, output = new DataOutputStream(new GZIPOutputStream(stream)));
+            swallow = false;
+        }
+        finally {
+            if (output != null) {
+                Closeables.close((Closeable)output, swallow);
+            }
+            else if (stream != null) {
+                Closeables.close((Closeable)stream, swallow);
+            }
         }
     }
     
@@ -254,9 +272,6 @@ public class NbtFactory
         if (type == NbtType.TAG_END) {
             throw new IllegalArgumentException("Cannot create a TAG_END.");
         }
-        if (MinecraftVersion.BEE_UPDATE.atOrAbove()) {
-            return createTagNew(type, name, (T[])new Object[0]);
-        }
         if (NbtFactory.methodCreateTag == null) {
             final Class<?> base = MinecraftReflection.getNBTBaseClass();
             try {
@@ -307,68 +322,7 @@ public class NbtFactory
         return new WrappedElement<T>(handle, name);
     }
     
-    @SafeVarargs
-    private static <T> NbtWrapper<T> createTagNew(final NbtType type, final String name, final T... values) {
-        if (type == NbtType.TAG_END) {
-            throw new IllegalArgumentException("Can't create END tags");
-        }
-        final int nbtId = type.getRawID();
-        final Class<?> valueType = type.getValueType();
-        Constructor<?> constructor = NbtFactory.CONSTRUCTORS.get(type);
-        if (constructor == null) {
-            if (NbtFactory.getTagType == null) {
-                final Class<?> tagTypes = MinecraftReflection.getMinecraftClass("NBTTagTypes");
-                final FuzzyReflection fuzzy = FuzzyReflection.fromClass(tagTypes, false);
-                NbtFactory.getTagType = fuzzy.getMethod(FuzzyMethodContract.newBuilder().parameterCount(1).parameterExactType(Integer.TYPE).build());
-            }
-            Class<?> nbtClass;
-            try {
-                nbtClass = NbtFactory.getTagType.invoke(null, nbtId).getClass().getEnclosingClass();
-            }
-            catch (ReflectiveOperationException ex) {
-                throw new RuntimeException("Failed to determine NBT class from " + type, ex);
-            }
-            try {
-                final FuzzyReflection fuzzy = FuzzyReflection.fromClass(nbtClass, true);
-                if (type == NbtType.TAG_LIST) {
-                    constructor = fuzzy.getConstructor(FuzzyMethodContract.newBuilder().parameterCount(0).build());
-                }
-                else {
-                    constructor = fuzzy.getConstructor(FuzzyMethodContract.newBuilder().parameterCount(1).parameterSuperOf(valueType).build());
-                }
-                constructor.setAccessible(true);
-            }
-            catch (Exception ex2) {
-                throw new RuntimeException("Failed to find NBT constructor in " + nbtClass, ex2);
-            }
-            NbtFactory.CONSTRUCTORS.put(type, constructor);
-        }
-        final T value = (values.length > 0) ? values[0] : DefaultInstances.DEFAULT.getDefault(valueType);
-        Object handle;
-        try {
-            if (type == NbtType.TAG_LIST) {
-                handle = constructor.newInstance(new Object[0]);
-            }
-            else {
-                handle = constructor.newInstance(value);
-            }
-        }
-        catch (Exception ex3) {
-            throw new RuntimeException("Failed to create NBT wrapper for " + type, ex3);
-        }
-        if (type == NbtType.TAG_COMPOUND) {
-            return (NbtWrapper<T>)new WrappedCompound(handle, name);
-        }
-        if (type == NbtType.TAG_LIST) {
-            return (NbtWrapper<T>)new WrappedList(handle, name);
-        }
-        return new WrappedElement<T>(handle, name);
-    }
-    
     public static <T> NbtWrapper<T> ofWrapper(final NbtType type, final String name, final T value) {
-        if (MinecraftVersion.BEE_UPDATE.atOrAbove()) {
-            return createTagNew(type, name, value);
-        }
         final NbtWrapper<T> created = ofWrapper(type, name);
         created.setValue(value);
         return created;
@@ -376,9 +330,5 @@ public class NbtFactory
     
     public static <T> NbtWrapper<T> ofWrapper(final Class<?> type, final String name, final T value) {
         return ofWrapper(NbtType.getTypeFromClass(type), name, value);
-    }
-    
-    static {
-        CONSTRUCTORS = new ConcurrentHashMap<NbtType, Constructor<?>>();
     }
 }

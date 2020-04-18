@@ -1,8 +1,10 @@
 Manifest-Version: 1.0
 Implementation-Title: ProtocolLib
-Implementation-Version: 4.5.1-SNAPSHOT
-Build-Jdk-Spec: 1.8
-Created-By: Maven Jar Plugin 3.2.0
+Implementation-Version: 4.4.0-SNAPSHOT-b390
+Archiver-Version: Plexus Archiver
+Built-By: WIN-QAITGSSVVQC$
+Created-By: Apache Maven 3.3.9
+Build-Jdk: 1.8.0_131
 Implementation-Vendor: dmulloy2
 Main-Class: com.comphenix.protocol.Application
 

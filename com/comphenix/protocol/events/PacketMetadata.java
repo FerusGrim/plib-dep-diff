@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import com.google.common.cache.CacheBuilder;
 import java.util.Iterator;
-import org.apache.commons.lang.Validate;
+import org.apache.commons.lang3.Validate;
 import java.util.Optional;
 import java.util.List;
 import com.google.common.cache.Cache;
@@ -17,7 +17,7 @@ class PacketMetadata
     private static Cache<Object, List<MetaObject>> META_CACHE;
     
     public static <T> Optional<T> get(final Object packet, final String key) {
-        Validate.notNull((Object)key, "Null keys are not permitted!");
+        Validate.notNull((Object)key, "Null keys are not permitted!", new Object[0]);
         if (PacketMetadata.META_CACHE == null) {
             return Optional.empty();
         }
@@ -38,7 +38,7 @@ class PacketMetadata
     }
     
     public static <T> void set(final Object packet, final String key, final T value) {
-        Validate.notNull((Object)key, "Null keys are not permitted!");
+        Validate.notNull((Object)key, "Null keys are not permitted!", new Object[0]);
         if (PacketMetadata.META_CACHE == null) {
             createCache();
         }
@@ -55,7 +55,7 @@ class PacketMetadata
     }
     
     public static <T> Optional<T> remove(final Object packet, final String key) {
-        Validate.notNull((Object)key, "Null keys are not permitted!");
+        Validate.notNull((Object)key, "Null keys are not permitted!", new Object[0]);
         if (PacketMetadata.META_CACHE == null) {
             return Optional.empty();
         }

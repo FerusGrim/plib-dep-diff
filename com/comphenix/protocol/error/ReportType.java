@@ -32,7 +32,7 @@ public class ReportType
     
     public static Class<?> getSenderClass(final Object sender) {
         if (sender == null) {
-            throw new IllegalArgumentException("sender cannot be null.");
+            throw new IllegalArgumentException("sender cannot be NUll.");
         }
         if (sender instanceof Class) {
             return (Class<?>)sender;
@@ -42,14 +42,14 @@ public class ReportType
     
     public static String getReportName(final Object sender, final ReportType type) {
         if (sender == null) {
-            throw new IllegalArgumentException("sender cannot be null.");
+            throw new IllegalArgumentException("sender cannot be NUll.");
         }
         return getReportName(getSenderClass(sender), type);
     }
     
     private static String getReportName(final Class<?> sender, final ReportType type) {
         if (sender == null) {
-            throw new IllegalArgumentException("sender cannot be null.");
+            throw new IllegalArgumentException("sender cannot be NUll.");
         }
         if (type.reportName == null) {
             for (final Field field : getReportFields(sender)) {
@@ -87,6 +87,6 @@ public class ReportType
     }
     
     private static List<Field> getReportFields(final Class<?> clazz) {
-        return FuzzyReflection.fromClass(clazz, true).getFieldList(FuzzyFieldContract.newBuilder().requireModifier(8).typeDerivedOf(ReportType.class).build());
+        return FuzzyReflection.fromClass(clazz).getFieldList(FuzzyFieldContract.newBuilder().requireModifier(8).typeDerivedOf(ReportType.class).build());
     }
 }

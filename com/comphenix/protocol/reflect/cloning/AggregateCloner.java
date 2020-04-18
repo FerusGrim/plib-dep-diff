@@ -61,15 +61,9 @@ public class AggregateCloner implements Cloner
             index = this.getFirstCloner(source);
         }
         if (index < this.cloners.size()) {
-            final Cloner cloner = this.cloners.get(index);
-            try {
-                return cloner.clone(source);
-            }
-            catch (Exception ex) {
-                throw new RuntimeException("Failed to clone " + source + " (" + source.getClass() + ") with " + cloner, ex);
-            }
+            return this.cloners.get(index).clone(source);
         }
-        throw new IllegalArgumentException("Cannot clone " + source + " ( " + source.getClass() + "): No cloner is suitable.");
+        throw new IllegalArgumentException("Cannot clone " + source + ": No cloner is suitable.");
     }
     
     static {

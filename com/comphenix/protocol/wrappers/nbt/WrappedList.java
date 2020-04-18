@@ -1,6 +1,5 @@
 package com.comphenix.protocol.wrappers.nbt;
 
-import com.comphenix.protocol.wrappers.ClonableWrapper;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import javax.annotation.Nullable;

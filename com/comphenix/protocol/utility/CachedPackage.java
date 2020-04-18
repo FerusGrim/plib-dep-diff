@@ -3,7 +3,7 @@ package com.comphenix.protocol.utility;
 import com.google.common.base.Strings;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-import java.util.Optional;
+import com.google.common.base.Optional;
 import java.util.Map;
 
 class CachedPackage
@@ -20,23 +20,36 @@ class CachedPackage
     
     public void setPackageClass(final String className, final Class<?> clazz) {
         if (clazz != null) {
-            this.cache.put(className, Optional.of(clazz));
+            this.cache.put(className, (Optional<Class<?>>)Optional.of((Object)clazz));
         }
         else {
             this.cache.remove(className);
         }
     }
     
-    public Optional<Class<?>> getPackageClass(final String className) {
+    public Class<?> getPackageClass(final String className) {
         Preconditions.checkNotNull((Object)className, (Object)"className cannot be null!");
-        return this.cache.computeIfAbsent(className, x -> {
+        if (this.cache.containsKey(className)) {
+            final Optional<Class<?>> result = this.cache.get(className);
+            if (!result.isPresent()) {
+                throw new RuntimeException("Cannot find class " + className);
+            }
+            return (Class<?>)result.get();
+        }
+        else {
             try {
-                return Optional.ofNullable(this.source.loadClass(combine(this.packageName, className)));
+                final Class<?> clazz = this.source.loadClass(combine(this.packageName, className));
+                if (clazz == null) {
+                    throw new IllegalArgumentException("Source " + this.source + " returned null for " + className);
+                }
+                this.cache.put(className, (Optional<Class<?>>)Optional.of((Object)clazz));
+                return clazz;
             }
             catch (ClassNotFoundException ex) {
-                return Optional.empty();
+                this.cache.put(className, (Optional<Class<?>>)Optional.absent());
+                throw new RuntimeException("Cannot find class " + className, ex);
             }
-        });
+        }
     }
     
     public static String combine(final String packageName, final String className) {

@@ -18,8 +18,7 @@ public enum NbtType
     TAG_INT_ARRAY(11, (Class<?>)int[].class), 
     TAG_STRING(8, (Class<?>)String.class), 
     TAG_LIST(9, (Class<?>)List.class), 
-    TAG_COMPOUND(10, (Class<?>)Map.class), 
-    TAG_LONG_ARRAY(12, (Class<?>)long[].class);
+    TAG_COMPOUND(10, (Class<?>)Map.class);
     
     private int rawID;
     private Class<?> valueType;

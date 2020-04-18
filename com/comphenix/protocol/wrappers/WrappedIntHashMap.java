@@ -12,7 +12,6 @@ import javax.annotation.Nonnull;
 import com.comphenix.protocol.utility.MinecraftReflection;
 import java.lang.reflect.Method;
 
-@Deprecated
 public class WrappedIntHashMap extends AbstractWrapper
 {
     private static Method PUT_METHOD;

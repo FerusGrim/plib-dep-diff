@@ -6,7 +6,7 @@ import java.text.SimpleDateFormat;
 import com.comphenix.protocol.injector.netty.WirePacket;
 import com.google.common.base.Charsets;
 import java.io.OutputStream;
-import org.bukkit.craftbukkit.libs.org.apache.commons.io.HexDump;
+import org.apache.commons.io.HexDump;
 import java.io.ByteArrayOutputStream;
 import com.comphenix.protocol.events.PacketEvent;
 import java.io.IOException;

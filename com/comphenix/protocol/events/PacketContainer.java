@@ -5,8 +5,7 @@ import com.comphenix.protocol.wrappers.nbt.NbtCompound;
 import java.lang.reflect.Array;
 import com.google.common.collect.Sets;
 import com.comphenix.protocol.reflect.cloning.CollectionCloner;
-import com.comphenix.protocol.reflect.cloning.GuavaOptionalCloner;
-import com.comphenix.protocol.reflect.cloning.JavaOptionalCloner;
+import com.comphenix.protocol.reflect.cloning.OptionalCloner;
 import com.comphenix.protocol.reflect.cloning.ImmutableDetector;
 import com.comphenix.protocol.reflect.cloning.BukkitCloner;
 import com.comphenix.protocol.reflect.instances.DefaultInstances;
@@ -40,7 +39,6 @@ import com.comphenix.protocol.reflect.cloning.SerializableCloner;
 import com.comphenix.protocol.wrappers.MinecraftKey;
 import org.bukkit.Sound;
 import org.bukkit.potion.PotionEffectType;
-import com.comphenix.protocol.wrappers.WrappedParticle;
 import com.comphenix.protocol.wrappers.EnumWrappers;
 import com.comphenix.protocol.wrappers.PlayerInfoData;
 import com.comphenix.protocol.wrappers.WrappedServerPing;
@@ -57,7 +55,6 @@ import com.comphenix.protocol.wrappers.nbt.NbtBase;
 import com.comphenix.protocol.wrappers.ChunkCoordIntPair;
 import com.comphenix.protocol.wrappers.BlockPosition;
 import com.comphenix.protocol.wrappers.ChunkPosition;
-import org.bukkit.entity.EntityType;
 import com.google.common.base.Preconditions;
 import org.bukkit.entity.Entity;
 import javax.annotation.Nonnull;
@@ -236,10 +233,6 @@ public class PacketContainer implements Serializable
         return this.getEntityModifier(event.getPlayer().getWorld());
     }
     
-    public StructureModifier<EntityType> getEntityTypeModifier() {
-        return this.structureModifier.withType(MinecraftReflection.getMinecraftClass("EntityTypes"), BukkitConverters.getEntityTypeConverter());
-    }
-    
     public StructureModifier<ChunkPosition> getPositionModifier() {
         return this.structureModifier.withType(MinecraftReflection.getChunkPositionClass(), ChunkPosition.getConverter());
     }
@@ -373,10 +366,6 @@ public class PacketContainer implements Serializable
         return this.structureModifier.withType(EnumWrappers.getParticleClass(), EnumWrappers.getParticleConverter());
     }
     
-    public StructureModifier<WrappedParticle> getNewParticles() {
-        return (StructureModifier<WrappedParticle>)this.structureModifier.withType(MinecraftReflection.getMinecraftClass("ParticleParam"), BukkitConverters.getParticleConverter());
-    }
-    
     public StructureModifier<PotionEffectType> getEffectTypes() {
         return this.structureModifier.withType(MinecraftReflection.getMobEffectListClass(), BukkitConverters.getEffectTypeConverter());
     }
@@ -407,10 +396,6 @@ public class PacketContainer implements Serializable
     
     public StructureModifier<MinecraftKey> getMinecraftKeys() {
         return this.structureModifier.withType(MinecraftReflection.getMinecraftKeyClass(), MinecraftKey.getConverter());
-    }
-    
-    public StructureModifier<Integer> getDimensions() {
-        return this.structureModifier.withType(MinecraftReflection.getMinecraftClass("DimensionManager"), BukkitConverters.getDimensionIDConverter());
     }
     
     public <K, V> StructureModifier<Map<K, V>> getMaps(final EquivalentConverter<K> keyConverter, final EquivalentConverter<V> valConverter) {
@@ -600,7 +585,7 @@ public class PacketContainer implements Serializable
     static {
         PacketContainer.writeMethods = (ConcurrentMap<Class<?>, Method>)Maps.newConcurrentMap();
         PacketContainer.readMethods = (ConcurrentMap<Class<?>, Method>)Maps.newConcurrentMap();
-        DEEP_CLONER = AggregateCloner.newBuilder().instanceProvider(DefaultInstances.DEFAULT).andThen(BukkitCloner.class).andThen(ImmutableDetector.class).andThen(JavaOptionalCloner.class).andThen(GuavaOptionalCloner.class).andThen(CollectionCloner.class).andThen(getSpecializedDeepClonerFactory()).build();
+        DEEP_CLONER = AggregateCloner.newBuilder().instanceProvider(DefaultInstances.DEFAULT).andThen(BukkitCloner.class).andThen(ImmutableDetector.class).andThen(OptionalCloner.class).andThen(CollectionCloner.class).andThen(getSpecializedDeepClonerFactory()).build();
         SHALLOW_CLONER = AggregateCloner.newBuilder().instanceProvider(DefaultInstances.DEFAULT).andThen((Function<AggregateCloner.BuilderParameters, Cloner>)(param -> {
             if (param == null) {
                 throw new IllegalArgumentException("Cannot be NULL.");

@@ -25,9 +25,9 @@ import com.comphenix.protocol.utility.MinecraftVersion;
 import com.comphenix.protocol.injector.PacketFilterManager;
 import com.comphenix.protocol.error.Report;
 import com.comphenix.protocol.error.DetailedErrorReporter;
-import org.bukkit.plugin.Plugin;
 import com.comphenix.executors.BukkitExecutors;
 import com.comphenix.protocol.utility.EnhancerFactory;
+import org.bukkit.plugin.Plugin;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
 import com.comphenix.protocol.updater.Updater;
@@ -88,7 +88,7 @@ public class ProtocolLib extends JavaPlugin
     
     public void onLoad() {
         ProtocolLib.logger = this.getLogger();
-        ProtocolLogger.init(this);
+        ProtocolLogger.init((Plugin)this);
         EnhancerFactory.getInstance().setClassLoader(this.getClassLoader());
         ProtocolLib.executorAsync = (ListeningScheduledExecutorService)BukkitExecutors.newAsynchronous((Plugin)this);
         ProtocolLib.executorSync = (ListeningScheduledExecutorService)BukkitExecutors.newSynchronous((Plugin)this);
@@ -313,7 +313,7 @@ public class ProtocolLib extends JavaPlugin
     
     private MinecraftVersion verifyMinecraftVersion() {
         final MinecraftVersion minimum = new MinecraftVersion("1.8");
-        final MinecraftVersion maximum = new MinecraftVersion("1.15.1");
+        final MinecraftVersion maximum = new MinecraftVersion("1.12.2");
         try {
             final MinecraftVersion current = new MinecraftVersion(this.getServer());
             if (!ProtocolLib.config.getIgnoreVersionCheck().equals(current.getVersion())) {

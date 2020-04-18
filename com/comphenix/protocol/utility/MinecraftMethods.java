@@ -1,13 +1,16 @@
 package com.comphenix.protocol.utility;
 
-import com.comphenix.net.sf.cglib.proxy.MethodProxy;
 import java.util.List;
 import com.comphenix.net.sf.cglib.proxy.Enhancer;
 import java.lang.reflect.InvocationTargetException;
 import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.PacketType;
 import io.netty.buffer.Unpooled;
+import com.comphenix.net.sf.cglib.proxy.Callback;
+import com.comphenix.net.sf.cglib.proxy.MethodProxy;
+import com.comphenix.net.sf.cglib.proxy.MethodInterceptor;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.util.concurrent.GenericFutureListener;
 import java.util.Iterator;
 import java.util.Map;
 import com.comphenix.protocol.reflect.MethodInfo;
@@ -60,7 +63,7 @@ public class MinecraftMethods
     
     public static Method getNetworkManagerHandleMethod() {
         if (MinecraftMethods.networkManagerHandle == null) {
-            (MinecraftMethods.networkManagerHandle = FuzzyReflection.fromClass(MinecraftReflection.getNetworkManagerClass(), true).getMethodByParameters("handle", MinecraftReflection.getPacketClass())).setAccessible(true);
+            (MinecraftMethods.networkManagerHandle = FuzzyReflection.fromClass(MinecraftReflection.getNetworkManagerClass(), true).getMethodByParameters("handle", MinecraftReflection.getPacketClass(), GenericFutureListener[].class)).setAccessible(true);
         }
         return MinecraftMethods.networkManagerHandle;
     }
@@ -91,33 +94,34 @@ public class MinecraftMethods
         if (MinecraftMethods.packetReadByteBuf == null || MinecraftMethods.packetWriteByteBuf == null) {
             final Enhancer enhancer = EnhancerFactory.getInstance().createEnhancer();
             enhancer.setSuperclass(MinecraftReflection.getPacketDataSerializerClass());
-            enhancer.setCallback((obj, method, args, proxy) -> {
-                if (method.getName().contains("read")) {
-                    throw new ReadMethodException();
-                }
-                else if (method.getName().contains("write")) {
-                    throw new WriteMethodException();
-                }
-                else {
+            enhancer.setCallback(new MethodInterceptor() {
+                @Override
+                public Object intercept(final Object obj, final Method method, final Object[] args, final MethodProxy proxy) throws Throwable {
+                    if (method.getName().contains("read")) {
+                        throw new ReadMethodException();
+                    }
+                    if (method.getName().contains("write")) {
+                        throw new WriteMethodException();
+                    }
                     return proxy.invokeSuper(obj, args);
                 }
             });
             final Object javaProxy = enhancer.create(new Class[] { MinecraftReflection.getByteBufClass() }, new Object[] { Unpooled.buffer() });
             final Object lookPacket = new PacketContainer(PacketType.Play.Client.CLOSE_WINDOW).getHandle();
             final List<Method> candidates = FuzzyReflection.fromClass(MinecraftReflection.getPacketClass()).getMethodListByParameters(Void.TYPE, new Class[] { MinecraftReflection.getPacketDataSerializerClass() });
-            for (final Method method2 : candidates) {
+            for (final Method method : candidates) {
                 try {
-                    method2.invoke(lookPacket, javaProxy);
+                    method.invoke(lookPacket, javaProxy);
                 }
                 catch (InvocationTargetException e) {
                     if (e.getCause() instanceof ReadMethodException) {
-                        MinecraftMethods.packetReadByteBuf = method2;
+                        MinecraftMethods.packetReadByteBuf = method;
                     }
                     else {
                         if (!(e.getCause() instanceof WriteMethodException)) {
                             continue;
                         }
-                        MinecraftMethods.packetWriteByteBuf = method2;
+                        MinecraftMethods.packetWriteByteBuf = method;
                     }
                 }
                 catch (Exception e2) {

@@ -102,7 +102,6 @@ public class WirePacket
             throw new RuntimeException("Failed to read packet contents.", ex);
         }
         final byte[] bytes = getBytes(buffer);
-        buffer.release();
         if (packet.getType() == PacketType.Play.Server.CUSTOM_PAYLOAD || packet.getType() == PacketType.Play.Client.CUSTOM_PAYLOAD) {
             final byte[] ret = Arrays.copyOf(bytes, bytes.length);
             store.writeBytes(bytes);
@@ -115,7 +114,6 @@ public class WirePacket
             }
             return ret;
         }
-        store.release();
         return bytes;
     }
     
@@ -132,9 +130,7 @@ public class WirePacket
         catch (ReflectiveOperationException ex) {
             throw new RuntimeException("Failed to serialize packet contents.", ex);
         }
-        final byte[] bytes = getBytes(buffer);
-        buffer.release();
-        return new WirePacket(id, bytes);
+        return new WirePacket(id, getBytes(buffer));
     }
     
     public static void writeVarInt(final ByteBuf output, int i) {

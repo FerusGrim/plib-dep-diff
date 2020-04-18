@@ -223,7 +223,7 @@ public abstract class AbstractIntervalTree<TKey extends Comparable<TKey>, TValue
         //    Signature:
         //  (TTKey;Z)Lcom/comphenix/protocol/concurrency/AbstractIntervalTree$EndPoint; [from metadata: (TTKey;Z)Lcom/comphenix/protocol/concurrency/AbstractIntervalTree<TTKey;TTValue;>.EndPoint;]
         //  
-        //    StackMapTable: 00 03 50 07 00 35 FF 00 04 00 03 07 00 02 07 00 59 01 00 02 07 00 35 07 00 59 13
+        //    StackMapTable: 00 03 50 07 00 33 FF 00 04 00 03 07 00 02 07 00 57 01 00 02 07 00 33 07 00 57 13
         // 
         // The error that occurred was:
         // 
@@ -305,7 +305,7 @@ public abstract class AbstractIntervalTree<TKey extends Comparable<TKey>, TValue
         //    Signature:
         //  (TTKey;Z)Lcom/comphenix/protocol/concurrency/AbstractIntervalTree$EndPoint; [from metadata: (TTKey;Z)Lcom/comphenix/protocol/concurrency/AbstractIntervalTree<TTKey;TTValue;>.EndPoint;]
         //  
-        //    StackMapTable: 00 03 50 07 00 35 FF 00 04 00 03 07 00 02 07 00 59 01 00 02 07 00 35 07 00 59 13
+        //    StackMapTable: 00 03 50 07 00 33 FF 00 04 00 03 07 00 02 07 00 57 01 00 02 07 00 33 07 00 57 13
         // 
         // The error that occurred was:
         // 

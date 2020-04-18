@@ -28,6 +28,7 @@ public class PacketEvent extends EventObject implements Cancellable
     private static final SetMultimap<PacketType, PacketType> CHANGE_WARNINGS;
     private static final long serialVersionUID = -5360289379097430620L;
     private transient WeakReference<Player> playerReference;
+    private transient Player offlinePlayer;
     private PacketContainer packet;
     private boolean serverPacket;
     private boolean cancel;
@@ -58,7 +59,7 @@ public class PacketEvent extends EventObject implements Cancellable
     private PacketEvent(final PacketEvent origial, final AsyncMarker asyncMarker) {
         super(origial.source);
         this.packet = origial.packet;
-        this.playerReference = origial.getPlayerReference();
+        this.playerReference = origial.playerReference;
         this.cancel = origial.cancel;
         this.serverPacket = origial.serverPacket;
         this.filtered = origial.filtered;
@@ -152,20 +153,17 @@ public class PacketEvent extends EventObject implements Cancellable
         this.cancel = cancel;
     }
     
-    private WeakReference<Player> getPlayerReference() {
+    public Player getPlayer() {
         final Player player = this.playerReference.get();
         if (player instanceof TemporaryPlayer) {
             final Player updated = player.getPlayer();
             if (updated != null && !(updated instanceof TemporaryPlayer)) {
                 this.playerReference.clear();
                 this.playerReference = new WeakReference<Player>(updated);
+                return updated;
             }
         }
-        return this.playerReference;
-    }
-    
-    public Player getPlayer() {
-        return this.getPlayerReference().get();
+        return player;
     }
     
     public boolean isPlayerTemporary() {
@@ -216,16 +214,15 @@ public class PacketEvent extends EventObject implements Cancellable
     
     private void writeObject(final ObjectOutputStream output) throws IOException {
         output.defaultWriteObject();
-        final Player player = this.getPlayer();
-        output.writeObject((player != null) ? new SerializedOfflinePlayer((OfflinePlayer)player) : null);
+        output.writeObject((this.playerReference.get() != null) ? new SerializedOfflinePlayer(this.playerReference.get()) : null);
     }
     
     private void readObject(final ObjectInputStream input) throws ClassNotFoundException, IOException {
         input.defaultReadObject();
         final SerializedOfflinePlayer serialized = (SerializedOfflinePlayer)input.readObject();
         if (serialized != null) {
-            final Player offlinePlayer = serialized.getPlayer();
-            this.playerReference = new WeakReference<Player>(offlinePlayer);
+            this.offlinePlayer = serialized.getPlayer();
+            this.playerReference = new WeakReference<Player>(this.offlinePlayer);
         }
     }
     

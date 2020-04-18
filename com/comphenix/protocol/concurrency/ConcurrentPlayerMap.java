@@ -1,15 +1,14 @@
 package com.comphenix.protocol.concurrency;
 
-import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.AbstractIterator;
 import java.util.AbstractSet;
 import java.util.Map;
 import java.util.Set;
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.util.Iterator;
 import com.comphenix.protocol.utility.Util;
 import com.google.common.cache.CacheLoader;
+import com.google.common.cache.RemovalNotification;
 import com.google.common.cache.RemovalListener;
 import com.comphenix.protocol.utility.SafeCacheBuilder;
 import com.google.common.collect.Maps;
@@ -20,9 +19,9 @@ import java.util.AbstractMap;
 
 public class ConcurrentPlayerMap<TValue> extends AbstractMap<Player, TValue> implements ConcurrentMap<Player, TValue>
 {
-    private ConcurrentMap<Object, TValue> valueLookup;
-    private ConcurrentMap<Object, Player> keyLookup;
-    private final Function<Player, Object> keyMethod;
+    protected ConcurrentMap<Object, TValue> valueLookup;
+    protected ConcurrentMap<Object, Player> keyLookup;
+    protected final Function<Player, Object> keyMethod;
     
     public static <T> ConcurrentPlayerMap<T> usingAddress() {
         return new ConcurrentPlayerMap<T>(PlayerKey.ADDRESS);
@@ -32,7 +31,7 @@ public class ConcurrentPlayerMap<TValue> extends AbstractMap<Player, TValue> imp
         return new ConcurrentPlayerMap<T>(PlayerKey.NAME);
     }
     
-    private ConcurrentPlayerMap(final PlayerKey standardMethod) {
+    public ConcurrentPlayerMap(final PlayerKey standardMethod) {
         this.valueLookup = this.createValueMap();
         this.keyLookup = this.createKeyCache();
         this.keyMethod = (Function<Player, Object>)standardMethod;
@@ -44,16 +43,18 @@ public class ConcurrentPlayerMap<TValue> extends AbstractMap<Player, TValue> imp
         this.keyMethod = method;
     }
     
-    private ConcurrentMap<Object, TValue> createValueMap() {
+    protected ConcurrentMap<Object, TValue> createValueMap() {
         return (ConcurrentMap<Object, TValue>)Maps.newConcurrentMap();
     }
     
-    private ConcurrentMap<Object, Player> createKeyCache() {
-        return SafeCacheBuilder.newBuilder().weakValues().removalListener((com.google.common.cache.RemovalListener<? super Object, ? super Object>)(removed -> {
-            if (removed.wasEvicted()) {
-                this.onCacheEvicted(removed.getKey());
+    protected ConcurrentMap<Object, Player> createKeyCache() {
+        return SafeCacheBuilder.newBuilder().weakValues().removalListener((com.google.common.cache.RemovalListener<? super Object, ? super Object>)new RemovalListener<Object, Player>() {
+            public void onRemoval(final RemovalNotification<Object, Player> removed) {
+                if (removed.wasEvicted()) {
+                    ConcurrentPlayerMap.this.onCacheEvicted(removed.getKey());
+                }
             }
-        })).build((com.google.common.cache.CacheLoader<? super Object, Player>)new CacheLoader<Object, Player>() {
+        }).build((com.google.common.cache.CacheLoader<? super Object, Player>)new CacheLoader<Object, Player>() {
             public Player load(final Object key) throws Exception {
                 final Player player = ConcurrentPlayerMap.this.findOnlinePlayer(key);
                 if (player != null) {
@@ -74,7 +75,7 @@ public class ConcurrentPlayerMap<TValue> extends AbstractMap<Player, TValue> imp
         }
     }
     
-    private Player findOnlinePlayer(final Object key) {
+    protected Player findOnlinePlayer(final Object key) {
         for (final Player player : Util.getOnlinePlayers()) {
             if (key.equals(this.keyMethod.apply((Object)player))) {
                 return player;
@@ -83,7 +84,7 @@ public class ConcurrentPlayerMap<TValue> extends AbstractMap<Player, TValue> imp
         return null;
     }
     
-    private Player lookupPlayer(final Object key) {
+    protected Player lookupPlayer(final Object key) {
         try {
             return this.keyLookup.get(key);
         }
@@ -92,8 +93,7 @@ public class ConcurrentPlayerMap<TValue> extends AbstractMap<Player, TValue> imp
         }
     }
     
-    private Object cachePlayerKey(final Player player) {
-        Preconditions.checkNotNull((Object)player, (Object)"player cannot be null");
+    protected Object cachePlayerKey(final Player player) {
         final Object key = this.keyMethod.apply((Object)player);
         this.keyLookup.put(key, player);
         return key;
@@ -221,12 +221,12 @@ public class ConcurrentPlayerMap<TValue> extends AbstractMap<Player, TValue> imp
     {
         ADDRESS {
             public Object apply(final Player player) {
-                return (player == null) ? null : player.getAddress();
+                return player.getAddress();
             }
         }, 
         NAME {
             public Object apply(final Player player) {
-                return (player == null) ? null : player.getName();
+                return player.getName();
             }
         };
     }

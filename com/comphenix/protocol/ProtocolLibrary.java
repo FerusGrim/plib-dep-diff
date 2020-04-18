@@ -11,8 +11,8 @@ import java.util.List;
 public class ProtocolLibrary
 {
     public static final String MINIMUM_MINECRAFT_VERSION = "1.8";
-    public static final String MAXIMUM_MINECRAFT_VERSION = "1.15.1";
-    public static final String MINECRAFT_LAST_RELEASE_DATE = "2019-12-17";
+    public static final String MAXIMUM_MINECRAFT_VERSION = "1.12.2";
+    public static final String MINECRAFT_LAST_RELEASE_DATE = "2017-09-18";
     public static final List<String> INCOMPATIBLE;
     private static Plugin plugin;
     private static ProtocolConfig config;

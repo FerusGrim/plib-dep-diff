@@ -684,17 +684,17 @@ public final class PacketFilterManager implements ListenerInvoker, InternalManag
     
     @Override
     public void updateEntity(final Entity entity, final List<Player> observers) throws FieldAccessException {
-        EntityUtilities.getInstance().updateEntity(entity, observers);
+        EntityUtilities.updateEntity(entity, observers);
     }
     
     @Override
     public Entity getEntityFromID(final World container, final int id) throws FieldAccessException {
-        return EntityUtilities.getInstance().getEntityFromID(container, id);
+        return EntityUtilities.getEntityFromID(container, id);
     }
     
     @Override
     public List<Player> getEntityTrackers(final Entity entity) throws FieldAccessException {
-        return EntityUtilities.getInstance().getEntityTrackers(entity);
+        return EntityUtilities.getEntityTrackers(entity);
     }
     
     public void initializePlayers(final List<Player> players) {

@@ -2,11 +2,11 @@ package com.comphenix.protocol.reflect.cloning;
 
 import com.google.common.base.Optional;
 
-public class GuavaOptionalCloner implements Cloner
+public class OptionalCloner implements Cloner
 {
     protected Cloner wrapped;
     
-    public GuavaOptionalCloner(final Cloner wrapped) {
+    public OptionalCloner(final Cloner wrapped) {
         this.wrapped = wrapped;
     }
     
