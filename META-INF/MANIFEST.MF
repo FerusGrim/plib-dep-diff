@@ -1,6 +1,7 @@
 Manifest-Version: 1.0
 Implementation-Title: ProtocolLib
-Implementation-Version: 4.4.0-b421
+Implementation-Version: 4.4.0-SNAPSHOT-b390
+Archiver-Version: Plexus Archiver
 Built-By: WIN-QAITGSSVVQC$
 Created-By: Apache Maven 3.3.9
 Build-Jdk: 1.8.0_131

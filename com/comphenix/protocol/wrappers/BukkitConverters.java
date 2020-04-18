@@ -36,10 +36,10 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.HashMap;
 import org.bukkit.Sound;
-import com.comphenix.protocol.reflect.accessors.MethodAccessor;
 import com.comphenix.protocol.reflect.accessors.FieldAccessor;
 import com.comphenix.protocol.reflect.StructureModifier;
 import java.lang.reflect.Constructor;
+import com.comphenix.protocol.reflect.accessors.MethodAccessor;
 import java.lang.reflect.Method;
 import com.comphenix.protocol.injector.PacketConstructor;
 import java.util.List;
@@ -50,15 +50,16 @@ public class BukkitConverters
 {
     private static boolean hasWorldType;
     private static boolean hasAttributeSnapshot;
+    private static Map<Class<?>, EquivalentConverter<Object>> specificConverters;
     private static Map<Class<?>, EquivalentConverter<Object>> genericConverters;
     private static List<PacketConstructor.Unwrapper> unwrappers;
     private static Method worldTypeName;
     private static Method worldTypeGetType;
+    private static MethodAccessor GET_BLOCK;
+    private static MethodAccessor GET_BLOCK_ID;
     private static volatile Constructor<?> mobEffectConstructor;
     private static volatile StructureModifier<Object> mobEffectModifier;
     private static FieldAccessor craftWorldField;
-    private static MethodAccessor BLOCK_FROM_MATERIAL;
-    private static MethodAccessor MATERIAL_FROM_BLOCK;
     private static Constructor<?> vec3dConstructor;
     private static StructureModifier<Object> vec3dModifier;
     private static MethodAccessor getSound;
@@ -67,8 +68,6 @@ public class BukkitConverters
     private static Map<String, Sound> soundIndex;
     private static MethodAccessor getMobEffectId;
     private static MethodAccessor getMobEffect;
-    private static MethodAccessor dimensionFromId;
-    private static MethodAccessor idFromDimension;
     
     public static <K, V> EquivalentConverter<Map<K, V>> getMapConverter(final EquivalentConverter<K> keyConverter, final EquivalentConverter<V> valConverter) {
         return new EquivalentConverter<Map<K, V>>() {
@@ -259,7 +258,7 @@ public class BukkitConverters
     }
     
     public static EquivalentConverter<WrappedBlockData> getWrappedBlockDataConverter() {
-        return Converters.ignoreNull((EquivalentConverter<WrappedBlockData>)Converters.handle(AbstractWrapper::getHandle, (Function<Object, T>)WrappedBlockData::fromHandle));
+        return Converters.ignoreNull((EquivalentConverter<WrappedBlockData>)Converters.handle(AbstractWrapper::getHandle, (Function<Object, T>)WrappedBlockData::new));
     }
     
     public static EquivalentConverter<WrappedAttribute> getWrappedAttributeConverter() {
@@ -439,29 +438,47 @@ public class BukkitConverters
     }
     
     public static EquivalentConverter<Material> getBlockConverter() {
-        if (BukkitConverters.BLOCK_FROM_MATERIAL == null || BukkitConverters.MATERIAL_FROM_BLOCK == null) {
-            final Class<?> magicNumbers = MinecraftReflection.getCraftBukkitClass("util.CraftMagicNumbers");
-            final Class<?> block = MinecraftReflection.getBlockClass();
-            final FuzzyReflection fuzzy = FuzzyReflection.fromClass(magicNumbers);
-            FuzzyMethodContract.Builder builder = FuzzyMethodContract.newBuilder().requireModifier(8).returnTypeExact(Material.class).parameterExactArray(block);
-            BukkitConverters.MATERIAL_FROM_BLOCK = Accessors.getMethodAccessor(fuzzy.getMethod(builder.build()));
-            builder = FuzzyMethodContract.newBuilder().requireModifier(8).returnTypeExact(block).parameterExactArray(Material.class);
-            BukkitConverters.BLOCK_FROM_MATERIAL = Accessors.getMethodAccessor(fuzzy.getMethod(builder.build()));
-        }
         return Converters.ignoreNull((EquivalentConverter<Material>)new EquivalentConverter<Material>() {
             @Override
             public Object getGeneric(final Material specific) {
-                return BukkitConverters.BLOCK_FROM_MATERIAL.invoke(null, specific);
+                return BukkitConverters.getBlockIDConverter().getGeneric(specific.getId());
             }
             
             @Override
             public Material getSpecific(final Object generic) {
-                return (Material)BukkitConverters.MATERIAL_FROM_BLOCK.invoke(null, generic);
+                return Material.getMaterial((int)BukkitConverters.getBlockIDConverter().getSpecific(generic));
             }
             
             @Override
             public Class<Material> getSpecificType() {
                 return Material.class;
+            }
+        });
+    }
+    
+    @Deprecated
+    public static EquivalentConverter<Integer> getBlockIDConverter() {
+        if (BukkitConverters.GET_BLOCK == null || BukkitConverters.GET_BLOCK_ID == null) {
+            final Class<?> block = MinecraftReflection.getBlockClass();
+            final FuzzyMethodContract getIdContract = FuzzyMethodContract.newBuilder().parameterExactArray(block).requireModifier(8).build();
+            final FuzzyMethodContract getBlockContract = FuzzyMethodContract.newBuilder().returnTypeExact(block).parameterExactArray(Integer.TYPE).requireModifier(8).build();
+            BukkitConverters.GET_BLOCK = Accessors.getMethodAccessor(FuzzyReflection.fromClass(block).getMethod(getBlockContract));
+            BukkitConverters.GET_BLOCK_ID = Accessors.getMethodAccessor(FuzzyReflection.fromClass(block).getMethod(getIdContract));
+        }
+        return Converters.ignoreNull((EquivalentConverter<Integer>)new EquivalentConverter<Integer>() {
+            @Override
+            public Object getGeneric(final Integer specific) {
+                return BukkitConverters.GET_BLOCK.invoke(null, specific);
+            }
+            
+            @Override
+            public Integer getSpecific(final Object generic) {
+                return (Integer)BukkitConverters.GET_BLOCK_ID.invoke(null, generic);
+            }
+            
+            @Override
+            public Class<Integer> getSpecificType() {
+                return Integer.class;
             }
         });
     }
@@ -604,10 +621,6 @@ public class BukkitConverters
         });
     }
     
-    public static EquivalentConverter<WrappedParticle> getParticleConverter() {
-        return (EquivalentConverter<WrappedParticle>)Converters.ignoreNull((EquivalentConverter<WrappedParticle>)Converters.handle(WrappedParticle::getHandle, (Function<Object, T>)WrappedParticle::fromHandle));
-    }
-    
     public static EquivalentConverter<Advancement> getAdvancementConverter() {
         return Converters.ignoreNull((EquivalentConverter<Advancement>)new EquivalentConverter<Advancement>() {
             @Override
@@ -714,37 +727,6 @@ public class BukkitConverters
         });
     }
     
-    public static EquivalentConverter<Integer> getDimensionIDConverter() {
-        return new EquivalentConverter<Integer>() {
-            @Override
-            public Object getGeneric(final Integer specific) {
-                if (BukkitConverters.dimensionFromId == null) {
-                    final Class<?> clazz = MinecraftReflection.getMinecraftClass("DimensionManager");
-                    final FuzzyReflection reflection = FuzzyReflection.fromClass(clazz, false);
-                    final FuzzyMethodContract contract = FuzzyMethodContract.newBuilder().requireModifier(8).parameterExactType(Integer.TYPE).returnTypeExact(clazz).build();
-                    BukkitConverters.dimensionFromId = Accessors.getMethodAccessor(reflection.getMethod(contract));
-                }
-                return BukkitConverters.dimensionFromId.invoke(null, specific);
-            }
-            
-            @Override
-            public Integer getSpecific(final Object generic) {
-                if (BukkitConverters.idFromDimension == null) {
-                    final Class<?> clazz = MinecraftReflection.getMinecraftClass("DimensionManager");
-                    final FuzzyReflection reflection = FuzzyReflection.fromClass(clazz, false);
-                    final FuzzyMethodContract contract = FuzzyMethodContract.newBuilder().banModifier(8).returnTypeExact(Integer.TYPE).parameterCount(0).build();
-                    BukkitConverters.idFromDimension = Accessors.getMethodAccessor(reflection.getMethod(contract));
-                }
-                return (Integer)BukkitConverters.idFromDimension.invoke(generic, new Object[0]);
-            }
-            
-            @Override
-            public Class<Integer> getSpecificType() {
-                return Integer.class;
-            }
-        };
-    }
-    
     static {
         BukkitConverters.hasWorldType = false;
         BukkitConverters.hasAttributeSnapshot = false;
@@ -770,8 +752,6 @@ public class BukkitConverters
         BukkitConverters.soundIndex = null;
         BukkitConverters.getMobEffectId = null;
         BukkitConverters.getMobEffect = null;
-        BukkitConverters.dimensionFromId = null;
-        BukkitConverters.idFromDimension = null;
     }
     
     @Deprecated

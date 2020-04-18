@@ -73,7 +73,6 @@ public class MinecraftReflection
     private static boolean initializing;
     private static Boolean cachedNetty;
     private static Boolean cachedWatcherObject;
-    private static Object itemStackAir;
     private static Method asNMSCopy;
     private static Method asCraftMirror;
     private static Boolean nullEnforced;
@@ -240,10 +239,6 @@ public class MinecraftReflection
     
     public static boolean is(final Class<?> clazz, final Object object) {
         return clazz != null && object != null && clazz.isAssignableFrom(object.getClass());
-    }
-    
-    public static boolean is(final Class<?> clazz, final Class<?> test) {
-        return clazz != null && test != null && clazz.isAssignableFrom(test);
     }
     
     public static boolean isChunkPosition(final Object obj) {
@@ -641,18 +636,6 @@ public class MinecraftReflection
         }
     }
     
-    public static Class<?> getItemClass() {
-        return getNullableNMS("Item");
-    }
-    
-    public static Class<?> getFluidTypeClass() {
-        return getNullableNMS("FluidType");
-    }
-    
-    public static Class<?> getParticleTypeClass() {
-        return getNullableNMS("ParticleType");
-    }
-    
     public static Class<?> getWorldTypeClass() {
         try {
             return getMinecraftClass("WorldType");
@@ -769,7 +752,7 @@ public class MinecraftReflection
     }
     
     public static Class<?> getDataWatcherSerializerClass() {
-        return getNullableNMS("DataWatcherSerializer");
+        return getMinecraftClass("DataWatcherSerializer");
     }
     
     public static Class<?> getDataWatcherRegistryClass() {
@@ -1093,22 +1076,13 @@ public class MinecraftReflection
             }
         }
         if (is(getCraftItemStackClass(), specific)) {
-            final Object unwrapped = new BukkitUnwrapper().unwrapItem(specific);
-            if (unwrapped != null) {
-                return unwrapped;
-            }
-            if (MinecraftReflection.itemStackAir == null) {
-                MinecraftReflection.itemStackAir = getMinecraftItemStack(new ItemStack(Material.AIR));
-            }
-            return MinecraftReflection.itemStackAir;
+            return new BukkitUnwrapper().unwrapItem(specific);
         }
-        else {
-            try {
-                return MinecraftReflection.asNMSCopy.invoke(null, specific);
-            }
-            catch (ReflectiveOperationException ex) {
-                throw new RuntimeException("Failed to make NMS copy of " + specific, ex);
-            }
+        try {
+            return MinecraftReflection.asNMSCopy.invoke(null, specific);
+        }
+        catch (ReflectiveOperationException ex) {
+            throw new RuntimeException("Failed to make NMS copy of " + specific, ex);
         }
     }
     
@@ -1125,29 +1099,14 @@ public class MinecraftReflection
         if (MinecraftReflection.craftbukkitPackage == null) {
             MinecraftReflection.craftbukkitPackage = new CachedPackage(getCraftBukkitPackage(), getClassSource());
         }
-        final RuntimeException ex;
-        return MinecraftReflection.craftbukkitPackage.getPackageClass(className).orElseThrow(() -> {
-            new RuntimeException("Failed to find CraftBukkit class: " + className);
-            return ex;
-        });
+        return MinecraftReflection.craftbukkitPackage.getPackageClass(className);
     }
     
     public static Class<?> getMinecraftClass(final String className) {
         if (MinecraftReflection.minecraftPackage == null) {
             MinecraftReflection.minecraftPackage = new CachedPackage(getMinecraftPackage(), getClassSource());
         }
-        final RuntimeException ex;
-        return MinecraftReflection.minecraftPackage.getPackageClass(className).orElseThrow(() -> {
-            new RuntimeException("Failed to find NMS class: " + className);
-            return ex;
-        });
-    }
-    
-    static Class<?> getNullableNMS(final String className) {
-        if (MinecraftReflection.minecraftPackage == null) {
-            MinecraftReflection.minecraftPackage = new CachedPackage(getMinecraftPackage(), getClassSource());
-        }
-        return MinecraftReflection.minecraftPackage.getPackageClass(className).orElse(null);
+        return MinecraftReflection.minecraftPackage.getPackageClass(className);
     }
     
     private static Class<?> setMinecraftClass(final String className, final Class<?> clazz) {
@@ -1208,11 +1167,7 @@ public class MinecraftReflection
         if (MinecraftReflection.libraryPackage == null) {
             MinecraftReflection.libraryPackage = new CachedPackage("", getClassSource());
         }
-        final RuntimeException ex;
-        return MinecraftReflection.libraryPackage.getPackageClass(className).orElseThrow(() -> {
-            new RuntimeException("Failed to find class: " + className);
-            return ex;
-        });
+        return MinecraftReflection.libraryPackage.getPackageClass(className);
     }
     
     private static Class<?> setMinecraftLibraryClass(final String className, final Class<?> clazz) {
@@ -1251,7 +1206,6 @@ public class MinecraftReflection
         MinecraftReflection.MINECRAFT_FULL_PACKAGE = null;
         MinecraftReflection.CRAFTBUKKIT_PACKAGE = null;
         MinecraftReflection.getBukkitEntityCache = (ConcurrentMap<Class<?>, MethodAccessor>)Maps.newConcurrentMap();
-        MinecraftReflection.itemStackAir = null;
         MinecraftReflection.asNMSCopy = null;
         MinecraftReflection.asCraftMirror = null;
         MinecraftReflection.nullEnforced = null;

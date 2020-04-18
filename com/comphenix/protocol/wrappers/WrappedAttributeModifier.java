@@ -8,7 +8,6 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nonnull;
 import com.comphenix.protocol.utility.MinecraftReflection;
-import java.util.function.Supplier;
 import java.util.UUID;
 import java.lang.reflect.Constructor;
 import com.comphenix.protocol.reflect.StructureModifier;
@@ -19,14 +18,14 @@ public class WrappedAttributeModifier extends AbstractWrapper
     private static Constructor<?> ATTRIBUTE_MODIFIER_CONSTRUCTOR;
     protected StructureModifier<Object> modifier;
     private final UUID uuid;
-    private final Supplier<String> name;
+    private final String name;
     private final Operation operation;
     private final double amount;
     
     protected WrappedAttributeModifier(final UUID uuid, final String name, final double amount, final Operation operation) {
         super(MinecraftReflection.getAttributeModifierClass());
         this.uuid = uuid;
-        this.name = (() -> name);
+        this.name = name;
         this.amount = amount;
         this.operation = operation;
     }
@@ -36,14 +35,7 @@ public class WrappedAttributeModifier extends AbstractWrapper
         this.setHandle(handle);
         this.initializeModifier(handle);
         this.uuid = this.modifier.withType(UUID.class).read(0);
-        final StructureModifier<String> stringMod = this.modifier.withType(String.class);
-        if (stringMod.size() == 0) {
-            final Supplier<String> supplier = this.modifier.withType(Supplier.class).read(0);
-            this.name = supplier;
-        }
-        else {
-            this.name = (() -> stringMod.read(0));
-        }
+        this.name = this.modifier.withType(String.class).read(0);
         this.amount = this.modifier.withType(Double.TYPE).read(0);
         this.operation = Operation.fromId(this.modifier.withType(Integer.TYPE).read(0));
     }
@@ -82,7 +74,7 @@ public class WrappedAttributeModifier extends AbstractWrapper
     }
     
     public String getName() {
-        return this.name.get();
+        return this.name;
     }
     
     public Operation getOperation() {

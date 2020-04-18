@@ -16,7 +16,6 @@ public class MinecraftVersion implements Comparable<MinecraftVersion>, Serializa
 {
     private static final long serialVersionUID = 1L;
     private static final Pattern VERSION_PATTERN;
-    public static final MinecraftVersion AQUATIC_UPDATE;
     public static final MinecraftVersion COLOR_UPDATE;
     public static final MinecraftVersion EXPLORATION_UPDATE;
     public static final MinecraftVersion FROSTBURN_UPDATE;
@@ -56,8 +55,8 @@ public class MinecraftVersion implements Comparable<MinecraftVersion>, Serializa
             try {
                 snapshot = new SnapshotVersion(section[0]);
                 final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-                final MinecraftVersion latest = new MinecraftVersion("1.13.1", false);
-                final boolean newer = snapshot.getSnapshotDate().compareTo(format.parse("2018-08-22")) > 0;
+                final MinecraftVersion latest = new MinecraftVersion("1.12.2", false);
+                final boolean newer = snapshot.getSnapshotDate().compareTo(format.parse("2017-09-18")) > 0;
                 numbers[0] = latest.getMajor();
                 numbers[1] = latest.getMinor() + (newer ? 1 : -1);
                 numbers[2] = 0;
@@ -188,13 +187,8 @@ public class MinecraftVersion implements Comparable<MinecraftVersion>, Serializa
         return MinecraftVersion.currentVersion;
     }
     
-    public static boolean atOrAbove(final MinecraftVersion version) {
-        return getCurrentVersion().isAtLeast(version);
-    }
-    
     static {
         VERSION_PATTERN = Pattern.compile(".*\\(.*MC.\\s*([a-zA-z0-9\\-\\.]+)\\s*\\)");
-        AQUATIC_UPDATE = new MinecraftVersion("1.13");
         COLOR_UPDATE = new MinecraftVersion("1.12");
         EXPLORATION_UPDATE = new MinecraftVersion("1.11");
         FROSTBURN_UPDATE = new MinecraftVersion("1.10");

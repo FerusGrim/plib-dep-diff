@@ -41,7 +41,8 @@ public final class SpigotUpdater extends Updater
     }
     
     public String getSpigotVersion() throws IOException {
-        try (final Closer closer = Closer.create()) {
+        final Closer closer = Closer.create();
+        try {
             final HttpURLConnection con = (HttpURLConnection)new URL("https://www.spigotmc.org/api/general.php").openConnection();
             con.setDoOutput(true);
             con.setRequestMethod("POST");
@@ -49,6 +50,9 @@ public final class SpigotUpdater extends Updater
             final InputStreamReader isr = closer.register(new InputStreamReader(con.getInputStream()));
             final BufferedReader br = closer.register(new BufferedReader(isr));
             return br.readLine();
+        }
+        finally {
+            closer.close();
         }
     }
     

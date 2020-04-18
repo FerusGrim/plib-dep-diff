@@ -1,8 +1,6 @@
 package com.comphenix.protocol.wrappers.nbt;
 
-import com.comphenix.protocol.wrappers.ClonableWrapper;
-
-public interface NbtBase<TType> extends ClonableWrapper
+public interface NbtBase<TType>
 {
     boolean accept(final NbtVisitor p0);
     
@@ -17,8 +15,4 @@ public interface NbtBase<TType> extends ClonableWrapper
     void setValue(final TType p0);
     
     NbtBase<TType> deepClone();
-    
-    default Object getHandle() {
-        return null;
-    }
 }

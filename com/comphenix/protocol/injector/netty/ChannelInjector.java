@@ -1,13 +1,15 @@
 package com.comphenix.protocol.injector.netty;
 
+import java.lang.reflect.InvocationTargetException;
 import java.net.SocketAddress;
 import io.netty.channel.socket.SocketChannel;
 import java.net.Socket;
 import com.comphenix.protocol.injector.server.SocketInjector;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import com.comphenix.protocol.utility.MinecraftFields;
-import org.apache.commons.lang3.Validate;
+import io.netty.util.concurrent.GenericFutureListener;
 import com.comphenix.protocol.utility.MinecraftMethods;
 import com.comphenix.protocol.wrappers.WrappedGameProfile;
 import com.comphenix.protocol.PacketType;
@@ -32,12 +34,12 @@ import com.comphenix.protocol.reflect.FuzzyReflection;
 import com.comphenix.protocol.ProtocolLibrary;
 import com.google.common.base.Preconditions;
 import java.util.ArrayDeque;
-import java.util.WeakHashMap;
+import com.google.common.collect.MapMaker;
 import com.comphenix.protocol.injector.NetworkProcessor;
 import java.util.Deque;
 import io.netty.handler.codec.MessageToByteEncoder;
 import com.comphenix.protocol.events.NetworkMarker;
-import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 import com.comphenix.protocol.reflect.VolatileField;
 import io.netty.channel.Channel;
 import org.bukkit.entity.Player;
@@ -51,10 +53,11 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 
 public class ChannelInjector extends ByteToMessageDecoder implements Injector
 {
-    private static final ReportType REPORT_CANNOT_INTERCEPT_SERVER_PACKET;
-    private static final ReportType REPORT_CANNOT_INTERCEPT_CLIENT_PACKET;
-    private static final ReportType REPORT_CANNOT_EXECUTE_IN_CHANNEL_THREAD;
-    private static final ReportType REPORT_CANNOT_SEND_PACKET;
+    public static final ReportType REPORT_CANNOT_INTERCEPT_SERVER_PACKET;
+    public static final ReportType REPORT_CANNOT_INTERCEPT_CLIENT_PACKET;
+    public static final ReportType REPORT_CANNOT_EXECUTE_IN_CHANNEL_THREAD;
+    public static final ReportType REPORT_CANNOT_FIND_GET_VERSION;
+    public static final ReportType REPORT_CANNOT_SEND_PACKET;
     private static final PacketEvent BYPASSED_PACKET;
     private static Class<?> PACKET_LOGIN_CLIENT;
     private static FieldAccessor LOGIN_GAME_PROFILE;
@@ -73,7 +76,7 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
     private final Object networkManager;
     private final Channel originalChannel;
     private VolatileField channelField;
-    private Map<Object, NetworkMarker> packetMarker;
+    private ConcurrentMap<Object, NetworkMarker> packetMarker;
     private PacketEvent currentEvent;
     private PacketEvent finalEvent;
     private final ThreadLocal<Boolean> scheduleProcessPackets;
@@ -85,9 +88,14 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
     private boolean injected;
     private boolean closed;
     
-    ChannelInjector(final Player player, final Object networkManager, final Channel channel, final ChannelListener channelListener, final InjectionFactory factory) {
-        this.packetMarker = new WeakHashMap<Object, NetworkMarker>();
-        this.scheduleProcessPackets = ThreadLocal.withInitial(() -> true);
+    public ChannelInjector(final Player player, final Object networkManager, final Channel channel, final ChannelListener channelListener, final InjectionFactory factory) {
+        this.packetMarker = (ConcurrentMap<Object, NetworkMarker>)new MapMaker().weakKeys().makeMap();
+        this.scheduleProcessPackets = new ThreadLocal<Boolean>() {
+            @Override
+            protected Boolean initialValue() {
+                return true;
+            }
+        };
         this.finishQueue = new ArrayDeque<PacketEvent>();
         this.player = (Player)Preconditions.checkNotNull((Object)player, (Object)"player cannot be NULL");
         this.networkManager = Preconditions.checkNotNull(networkManager, (Object)"networkMananger cannot be NULL");
@@ -115,7 +123,12 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
                 return false;
             }
             if (Bukkit.isPrimaryThread()) {
-                this.executeInChannelThread(this::inject);
+                this.executeInChannelThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        ChannelInjector.this.inject();
+                    }
+                });
                 return false;
             }
             if (findChannelHandler(this.originalChannel, ChannelInjector.class) != null) {
@@ -137,7 +150,7 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
                 ChannelInjector.ENCODE_BUFFER = Accessors.getMethodAccessor(this.vanillaEncoder.getClass(), "encode", ChannelHandlerContext.class, Object.class, ByteBuf.class);
             }
             final MessageToByteEncoder<Object> protocolEncoder = new MessageToByteEncoder<Object>() {
-                protected void encode(final ChannelHandlerContext ctx, final Object packet, final ByteBuf output) {
+                protected void encode(final ChannelHandlerContext ctx, final Object packet, final ByteBuf output) throws Exception {
                     if (packet instanceof WirePacket) {
                         ChannelInjector.this.encodeWirePacket((WirePacket)packet, output);
                     }
@@ -148,13 +161,13 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
                 
                 public void write(final ChannelHandlerContext ctx, final Object packet, final ChannelPromise promise) throws Exception {
                     super.write(ctx, packet, promise);
-                    ChannelInjector.this.finalWrite();
+                    ChannelInjector.this.finalWrite(ctx, packet, promise);
                 }
             };
             final ChannelInboundHandlerAdapter finishHandler = new ChannelInboundHandlerAdapter() {
-                public void channelRead(final ChannelHandlerContext ctx, final Object msg) {
+                public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
                     ctx.fireChannelRead(msg);
-                    ChannelInjector.this.finishRead();
+                    ChannelInjector.this.finishRead(ctx, msg);
                 }
             };
             this.originalChannel.pipeline().addBefore("decoder", "protocol_lib_decoder", (ChannelHandler)this);
@@ -183,13 +196,16 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
                     if (event != null && event.isCancelled()) {
                         return null;
                     }
-                    final Object result;
-                    return (Callable<T>)(() -> {
-                        ChannelInjector.this.currentEvent = event;
-                        result = callable.call();
-                        ChannelInjector.this.currentEvent = null;
-                        return result;
-                    });
+                    return new Callable<T>() {
+                        @Override
+                        public T call() throws Exception {
+                            T result = null;
+                            ChannelInjector.this.currentEvent = event;
+                            result = callable.call();
+                            ChannelInjector.this.currentEvent = null;
+                            return result;
+                        }
+                    };
                 }
                 
                 @Override
@@ -198,14 +214,17 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
                     if (event != null && event.isCancelled()) {
                         return null;
                     }
-                    return () -> {
-                        ChannelInjector.this.currentEvent = event;
-                        runnable.run();
-                        ChannelInjector.this.currentEvent = null;
+                    return new Runnable() {
+                        @Override
+                        public void run() {
+                            ChannelInjector.this.currentEvent = event;
+                            runnable.run();
+                            ChannelInjector.this.currentEvent = null;
+                        }
                     };
                 }
                 
-                PacketEvent handleScheduled(final Object instance, final FieldAccessor accessor) {
+                protected PacketEvent handleScheduled(final Object instance, final FieldAccessor accessor) {
                     final Object original = accessor.get(instance);
                     if (ChannelInjector.this.scheduleProcessPackets.get()) {
                         final PacketEvent event = ChannelInjector.this.processSending(original);
@@ -253,12 +272,12 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
         super.exceptionCaught(ctx, cause);
     }
     
-    private void encodeWirePacket(final WirePacket packet, final ByteBuf output) {
+    protected void encodeWirePacket(final WirePacket packet, final ByteBuf output) throws Exception {
         packet.writeId(output);
         packet.writeBytes(output);
     }
     
-    private void encode(final ChannelHandlerContext ctx, Object packet, final ByteBuf output) {
+    protected void encode(final ChannelHandlerContext ctx, Object packet, final ByteBuf output) throws Exception {
         NetworkMarker marker = null;
         PacketEvent event = this.currentEvent;
         try {
@@ -301,7 +320,7 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
         }
     }
     
-    private void finalWrite() {
+    protected void finalWrite(final ChannelHandlerContext ctx, final Object packet, final ChannelPromise promise) {
         final PacketEvent event = this.finalEvent;
         if (event != null) {
             this.finalEvent = null;
@@ -311,14 +330,16 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
     }
     
     private void scheduleMainThread(final Object packetCopy) {
-        Bukkit.getScheduler().scheduleSyncDelayedTask(this.factory.getPlugin(), () -> {
-            if (!this.closed) {
-                this.invokeSendPacket(packetCopy);
+        Bukkit.getScheduler().scheduleSyncDelayedTask(this.factory.getPlugin(), (Runnable)new Runnable() {
+            @Override
+            public void run() {
+                ChannelInjector.this.invokeSendPacket(packetCopy);
             }
         });
     }
     
-    protected void decode(final ChannelHandlerContext ctx, final ByteBuf byteBuffer, final List<Object> packets) {
+    protected void decode(final ChannelHandlerContext ctx, final ByteBuf byteBuffer, final List<Object> packets) throws Exception {
+        byteBuffer.markReaderIndex();
         ChannelInjector.DECODE_BUFFER.invoke(this.vanillaDecoder, ctx, byteBuffer, packets);
         try {
             this.finishQueue.clear();
@@ -351,7 +372,7 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
         }
     }
     
-    private void finishRead() {
+    protected void finishRead(final ChannelHandlerContext ctx, final Object msg) {
         final PacketEvent event = this.finishQueue.pollFirst();
         if (event != null) {
             final NetworkMarker marker = NetworkMarker.getNetworkMarker(event);
@@ -361,7 +382,7 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
         }
     }
     
-    private void handleLogin(final Class<?> packetClass, final Object packet) {
+    protected void handleLogin(final Class<?> packetClass, final Object packet) {
         if (ChannelInjector.PACKET_LOGIN_CLIENT == null) {
             ChannelInjector.PACKET_LOGIN_CLIENT = PacketType.Login.Client.START.getPacketClass();
         }
@@ -432,10 +453,9 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
     }
     
     private void invokeSendPacket(final Object packet) {
-        Validate.isTrue(!this.closed, "cannot send packets to a closed channel", new Object[0]);
         try {
             if (this.player instanceof Factory) {
-                MinecraftMethods.getNetworkManagerHandleMethod().invoke(this.networkManager, packet);
+                MinecraftMethods.getNetworkManagerHandleMethod().invoke(this.networkManager, packet, new GenericFutureListener[0]);
             }
             else {
                 MinecraftMethods.getSendPacketMethod().invoke(this.getPlayerConnection(), packet);
@@ -447,14 +467,16 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
     }
     
     public void recieveClientPacket(final Object packet) {
-        final Runnable action = () -> {
-            try {
-                MinecraftMethods.getNetworkManagerReadPacketMethod().invoke(this.networkManager, null, packet);
+        final Runnable action = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    MinecraftMethods.getNetworkManagerReadPacketMethod().invoke(ChannelInjector.this.networkManager, null, packet);
+                }
+                catch (Exception e) {
+                    ProtocolLibrary.getErrorReporter().reportMinimal(ChannelInjector.this.factory.getPlugin(), "recieveClientPacket", e);
+                }
             }
-            catch (Exception e) {
-                ProtocolLibrary.getErrorReporter().reportMinimal(this.factory.getPlugin(), "recieveClientPacket", e);
-            }
-            return;
         };
         if (this.originalChannel.eventLoop().inEventLoop()) {
             action.run();
@@ -473,11 +495,7 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
     
     private Object getPlayerConnection() {
         if (this.playerConnection == null) {
-            final Player player = this.getPlayer();
-            if (player == null) {
-                throw new IllegalStateException("cannot send packet to offline player" + ((this.playerName != null) ? (" " + this.playerName) : ""));
-            }
-            this.playerConnection = MinecraftFields.getPlayerConnection(player);
+            this.playerConnection = MinecraftFields.getPlayerConnection(this.getPlayer());
         }
         return this.playerConnection;
     }
@@ -494,7 +512,7 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
     
     public Player getPlayer() {
         if (this.player == null && this.playerName != null) {
-            return Bukkit.getPlayerExact(this.playerName);
+            return Bukkit.getPlayer(this.playerName);
         }
         return this.player;
     }
@@ -522,21 +540,18 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
             this.closed = true;
             if (this.injected) {
                 this.channelField.revertValue();
-                final String[] array;
-                final String[] handlers;
-                int length;
-                int i = 0;
-                String handler;
-                this.executeInChannelThread(() -> {
-                    handlers = (array = new String[] { "protocol_lib_decoder", "protocol_lib_finish", "protocol_lib_encoder" });
-                    for (length = array.length; i < length; ++i) {
-                        handler = array[i];
-                        try {
-                            this.originalChannel.pipeline().remove(handler);
+                this.executeInChannelThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        final String[] array;
+                        final String[] handlers = array = new String[] { "protocol_lib_decoder", "protocol_lib_finish", "protocol_lib_encoder" };
+                        for (final String handler : array) {
+                            try {
+                                ChannelInjector.this.originalChannel.pipeline().remove(handler);
+                            }
+                            catch (NoSuchElementException ex) {}
                         }
-                        catch (NoSuchElementException ex) {}
                     }
-                    return;
                 });
                 this.factory.invalidate(this.player);
                 this.player = null;
@@ -546,17 +561,20 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
     }
     
     private void executeInChannelThread(final Runnable command) {
-        this.originalChannel.eventLoop().execute(() -> {
-            try {
-                command.run();
-            }
-            catch (Exception e) {
-                ProtocolLibrary.getErrorReporter().reportDetailed(this, Report.newBuilder(ChannelInjector.REPORT_CANNOT_EXECUTE_IN_CHANNEL_THREAD).error(e).build());
+        this.originalChannel.eventLoop().execute((Runnable)new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    command.run();
+                }
+                catch (Exception e) {
+                    ProtocolLibrary.getErrorReporter().reportDetailed(ChannelInjector.this, Report.newBuilder(ChannelInjector.REPORT_CANNOT_EXECUTE_IN_CHANNEL_THREAD).error(e).build());
+                }
             }
         });
     }
     
-    static ChannelHandler findChannelHandler(final Channel channel, final Class<?> clazz) {
+    public static ChannelHandler findChannelHandler(final Channel channel, final Class<?> clazz) {
         for (final Map.Entry<String, ChannelHandler> entry : channel.pipeline()) {
             if (clazz.isAssignableFrom(entry.getValue().getClass())) {
                 return entry.getValue();
@@ -573,40 +591,46 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
         REPORT_CANNOT_INTERCEPT_SERVER_PACKET = new ReportType("Unable to intercept a written server packet.");
         REPORT_CANNOT_INTERCEPT_CLIENT_PACKET = new ReportType("Unable to intercept a read client packet.");
         REPORT_CANNOT_EXECUTE_IN_CHANNEL_THREAD = new ReportType("Cannot execute code in channel thread.");
+        REPORT_CANNOT_FIND_GET_VERSION = new ReportType("Cannot find getVersion() in NetworkMananger");
         REPORT_CANNOT_SEND_PACKET = new ReportType("Unable to send packet %s to %s");
         BYPASSED_PACKET = new PacketEvent(ChannelInjector.class);
         ChannelInjector.PACKET_LOGIN_CLIENT = null;
         ChannelInjector.LOGIN_GAME_PROFILE = null;
         ChannelInjector.PACKET_SET_PROTOCOL = null;
         ChannelInjector.keyId = new AtomicInteger();
-        ChannelInjector.PROTOCOL_KEY = (AttributeKey<Integer>)AttributeKey.valueOf("PROTOCOL-" + ChannelInjector.keyId.getAndIncrement());
+        try {
+            ChannelInjector.PROTOCOL_KEY = (AttributeKey<Integer>)AttributeKey.valueOf("PROTOCOL");
+        }
+        catch (IllegalArgumentException ex) {
+            ChannelInjector.PROTOCOL_KEY = (AttributeKey<Integer>)AttributeKey.valueOf("PROTOCOL-" + ChannelInjector.keyId.getAndIncrement());
+        }
     }
     
     public static class ChannelSocketInjector implements SocketInjector
     {
         private final ChannelInjector injector;
         
-        ChannelSocketInjector(final ChannelInjector injector) {
+        public ChannelSocketInjector(final ChannelInjector injector) {
             this.injector = (ChannelInjector)Preconditions.checkNotNull((Object)injector, (Object)"injector cannot be NULL");
         }
         
         @Override
-        public Socket getSocket() {
+        public Socket getSocket() throws IllegalAccessException {
             return SocketAdapter.adapt((SocketChannel)this.injector.originalChannel);
         }
         
         @Override
-        public SocketAddress getAddress() {
+        public SocketAddress getAddress() throws IllegalAccessException {
             return this.injector.originalChannel.remoteAddress();
         }
         
         @Override
-        public void disconnect(final String message) {
+        public void disconnect(final String message) throws InvocationTargetException {
             this.injector.disconnect(message);
         }
         
         @Override
-        public void sendServerPacket(final Object packet, final NetworkMarker marker, final boolean filtered) {
+        public void sendServerPacket(final Object packet, final NetworkMarker marker, final boolean filtered) throws InvocationTargetException {
             this.injector.sendServerPacket(packet, marker, filtered);
         }
         
@@ -629,7 +653,7 @@ public class ChannelInjector extends ByteToMessageDecoder implements Injector
             this.injector.setPlayer(updatedPlayer);
         }
         
-        ChannelInjector getChannelInjector() {
+        public ChannelInjector getChannelInjector() {
             return this.injector;
         }
     }

@@ -1,12 +1,12 @@
 package com.comphenix.protocol.reflect.cloning;
 
-import java.util.Optional;
+import com.google.common.base.Optional;
 
-public class JavaOptionalCloner implements Cloner
+public class OptionalCloner implements Cloner
 {
     protected Cloner wrapped;
     
-    public JavaOptionalCloner(final Cloner wrapped) {
+    public OptionalCloner(final Cloner wrapped) {
         this.wrapped = wrapped;
     }
     
@@ -18,7 +18,10 @@ public class JavaOptionalCloner implements Cloner
     @Override
     public Object clone(final Object source) {
         final Optional<?> optional = (Optional<?>)source;
-        return optional.map(o -> this.wrapped.clone(o));
+        if (!optional.isPresent()) {
+            return Optional.absent();
+        }
+        return Optional.of(this.wrapped.clone(optional.get()));
     }
     
     public Cloner getWrapped() {

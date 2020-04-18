@@ -6,7 +6,6 @@ import org.bukkit.GameMode;
 import com.google.common.collect.Maps;
 import com.comphenix.protocol.reflect.FuzzyReflection;
 import java.lang.reflect.Field;
-import com.comphenix.protocol.ProtocolLogger;
 import com.comphenix.protocol.PacketType;
 import com.comphenix.protocol.utility.MinecraftReflection;
 import com.comphenix.protocol.reflect.EquivalentConverter;
@@ -94,7 +93,6 @@ public abstract class EnumWrappers
             EnumWrappers.FROM_NATIVE.put(nativeClass, converter);
             EnumWrappers.FROM_WRAPPER.put(wrapperClass, converter);
         }
-        else if (ProtocolLogger.isDebugEnabled()) {}
     }
     
     private static Class<?> getEnum(final Class<?> clazz, final int index) {
@@ -430,7 +428,6 @@ public abstract class EnumWrappers
     {
         TITLE, 
         SUBTITLE, 
-        ACTIONBAR, 
         TIMES, 
         CLEAR, 
         RESET;
@@ -651,12 +648,18 @@ public abstract class EnumWrappers
     
     public enum ChatType
     {
-        CHAT, 
-        SYSTEM, 
-        GAME_INFO;
+        CHAT(0), 
+        SYSTEM(1), 
+        GAME_INFO(2);
+        
+        private byte id;
+        
+        private ChatType(final int id) {
+            this.id = (byte)id;
+        }
         
         public byte getId() {
-            return (byte)this.ordinal();
+            return this.id;
         }
     }
     

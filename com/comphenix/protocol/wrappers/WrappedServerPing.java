@@ -34,7 +34,7 @@ import com.comphenix.protocol.reflect.EquivalentConverter;
 import com.comphenix.protocol.reflect.accessors.FieldAccessor;
 import com.comphenix.protocol.reflect.accessors.ConstructorAccessor;
 
-public class WrappedServerPing extends AbstractWrapper implements ClonableWrapper
+public class WrappedServerPing extends AbstractWrapper
 {
     private static Class<?> GAME_PROFILE;
     private static Class<?> GAME_PROFILE_ARRAY;
@@ -205,7 +205,6 @@ public class WrappedServerPing extends AbstractWrapper implements ClonableWrappe
         WrappedServerPing.VERSION_PROTOCOL.set(this.version, protocol);
     }
     
-    @Override
     public WrappedServerPing deepClone() {
         final WrappedServerPing copy = new WrappedServerPing();
         final WrappedChatComponent motd = this.getMotD();

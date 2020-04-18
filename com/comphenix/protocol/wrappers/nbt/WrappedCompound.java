@@ -1,6 +1,5 @@
 package com.comphenix.protocol.wrappers.nbt;
 
-import com.comphenix.protocol.wrappers.ClonableWrapper;
 import com.comphenix.protocol.wrappers.nbt.io.NbtBinarySerializer;
 import java.io.DataOutput;
 import java.util.Set;

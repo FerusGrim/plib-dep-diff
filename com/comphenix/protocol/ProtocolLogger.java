@@ -12,12 +12,12 @@ public class ProtocolLogger
         ProtocolLogger.plugin = plugin;
     }
     
-    public static boolean isDebugEnabled() {
+    private static boolean isDebugEnabled() {
         try {
             return ProtocolLogger.plugin.getConfig().getBoolean("global.debug", false);
         }
         catch (Throwable ex) {
-            return true;
+            return false;
         }
     }
     

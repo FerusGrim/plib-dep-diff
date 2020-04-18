@@ -1,8 +1,5 @@
 package com.comphenix.protocol.reflect.cloning;
 
-import com.comphenix.protocol.utility.MinecraftVersion;
-import com.google.common.collect.Sets;
-import com.google.common.collect.ImmutableSet;
 import java.security.PublicKey;
 import javax.crypto.SecretKey;
 import java.net.InetSocketAddress;
@@ -14,26 +11,12 @@ import java.util.UUID;
 import java.util.Locale;
 import java.math.BigInteger;
 import java.math.BigDecimal;
-import java.util.Iterator;
 import com.comphenix.protocol.utility.MinecraftReflection;
 import com.google.common.primitives.Primitives;
-import java.util.function.Supplier;
-import java.util.Set;
 
 public class ImmutableDetector implements Cloner
 {
-    private static final Set<Class<?>> immutableClasses;
-    private static final Set<Class<?>> immutableNMS;
-    
-    private static void add(final Supplier<Class<?>> getClass) {
-        try {
-            final Class<?> clazz = getClass.get();
-            if (clazz != null) {
-                ImmutableDetector.immutableNMS.add(clazz);
-            }
-        }
-        catch (RuntimeException ex) {}
-    }
+    private static final Class<?>[] immutableClasses;
     
     @Override
     public boolean canClone(final Object source) {
@@ -50,18 +33,12 @@ public class ImmutableDetector implements Cloner
         if (isEnumWorkaround(type)) {
             return true;
         }
-        if (type.getName().contains("$$Lambda$")) {
-            return true;
-        }
-        if (ImmutableDetector.immutableClasses.contains(type)) {
-            return true;
-        }
-        for (final Class<?> clazz : ImmutableDetector.immutableNMS) {
-            if (MinecraftReflection.is(clazz, type)) {
+        for (final Class<?> clazz : ImmutableDetector.immutableClasses) {
+            if (clazz.equals(type)) {
                 return true;
             }
         }
-        return false;
+        return (MinecraftReflection.isUsingNetty() && type.equals(MinecraftReflection.getGameProfileClass())) || (MinecraftReflection.watcherObjectExists() && (type.equals(MinecraftReflection.getDataWatcherSerializerClass()) || type.equals(MinecraftReflection.getMinecraftClass("SoundEffect"))));
     }
     
     private static boolean isEnumWorkaround(Class<?> enumClass) {
@@ -80,17 +57,6 @@ public class ImmutableDetector implements Cloner
     }
     
     static {
-        immutableClasses = (Set)ImmutableSet.of((Object)StackTraceElement.class, (Object)BigDecimal.class, (Object)BigInteger.class, (Object)Locale.class, (Object)UUID.class, (Object)URL.class, (Object[])new Class[] { URI.class, Inet4Address.class, Inet6Address.class, InetSocketAddress.class, SecretKey.class, PublicKey.class });
-        immutableNMS = Sets.newConcurrentHashSet();
-        add(MinecraftReflection::getGameProfileClass);
-        add(MinecraftReflection::getDataWatcherSerializerClass);
-        add(() -> MinecraftReflection.getMinecraftClass("SoundEffect"));
-        add(MinecraftReflection::getBlockClass);
-        add(MinecraftReflection::getItemClass);
-        if (MinecraftVersion.atOrAbove(MinecraftVersion.AQUATIC_UPDATE)) {
-            add(() -> MinecraftReflection.getMinecraftClass("Particle"));
-            add(MinecraftReflection::getFluidTypeClass);
-            add(MinecraftReflection::getParticleTypeClass);
-        }
+        immutableClasses = new Class[] { StackTraceElement.class, BigDecimal.class, BigInteger.class, Locale.class, UUID.class, URL.class, URI.class, Inet4Address.class, Inet6Address.class, InetSocketAddress.class, SecretKey.class, PublicKey.class };
     }
 }

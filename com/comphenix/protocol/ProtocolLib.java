@@ -313,7 +313,7 @@ public class ProtocolLib extends JavaPlugin
     
     private MinecraftVersion verifyMinecraftVersion() {
         final MinecraftVersion minimum = new MinecraftVersion("1.8");
-        final MinecraftVersion maximum = new MinecraftVersion("1.13.1");
+        final MinecraftVersion maximum = new MinecraftVersion("1.12.2");
         try {
             final MinecraftVersion current = new MinecraftVersion(this.getServer());
             if (!ProtocolLib.config.getIgnoreVersionCheck().equals(current.getVersion())) {

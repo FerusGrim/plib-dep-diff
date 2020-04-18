@@ -10,6 +10,11 @@ import org.json.simple.JSONArray;
 import java.io.Reader;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.Enumeration;
+import java.io.OutputStream;
+import java.io.BufferedOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.io.FileOutputStream;
 import java.io.BufferedInputStream;
 import java.net.MalformedURLException;
@@ -32,7 +37,7 @@ public class BukkitUpdater extends Updater
     private static final String VERSION_VALUE = "gameVersion";
     private static final Object FILE_NAME;
     private static final String QUERY = "/servermods/files?projectIds=";
-    private static final String HOST = "https://servermods.forgesvc.net";
+    private static final String HOST = "https://api.curseforge.com";
     private static final int BYTE_SIZE = 1024;
     private YamlConfiguration config;
     private String updateFolder;
@@ -86,7 +91,7 @@ public class BukkitUpdater extends Updater
             this.apiKey = key;
         }
         try {
-            this.url = new URL("https://servermods.forgesvc.net/servermods/files?projectIds=" + id);
+            this.url = new URL("https://api.curseforge.com/servermods/files?projectIds=" + id);
         }
         catch (MalformedURLException e2) {
             plugin.getLogger().severe("The project ID provided for updating, " + id + " is invalid.");
@@ -127,6 +132,15 @@ public class BukkitUpdater extends Updater
                     this.plugin.getLogger().info("Downloading update: " + percent + "% of " + fileLength + " bytes.");
                 }
             }
+            for (final File xFile : new File(this.plugin.getDataFolder().getParent(), this.updateFolder).listFiles()) {
+                if (xFile.getName().endsWith(".zip")) {
+                    xFile.delete();
+                }
+            }
+            final File dFile = new File(folder.getAbsolutePath() + "/" + file);
+            if (dFile.getName().endsWith(".zip")) {
+                this.unzip(dFile.getCanonicalPath());
+            }
             if (this.announce) {
                 this.plugin.getLogger().info("Finished updating.");
             }
@@ -148,6 +162,82 @@ public class BukkitUpdater extends Updater
         }
     }
     
+    private void unzip(final String file) {
+        try {
+            final File fSourceZip = new File(file);
+            final String zipPath = file.substring(0, file.length() - 4);
+            ZipFile zipFile = new ZipFile(fSourceZip);
+            Enumeration<? extends ZipEntry> e = zipFile.entries();
+            while (e.hasMoreElements()) {
+                ZipEntry entry = (ZipEntry)e.nextElement();
+                File destinationFilePath = new File(zipPath, entry.getName());
+                destinationFilePath.getParentFile().mkdirs();
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                final BufferedInputStream bis = new BufferedInputStream(zipFile.getInputStream(entry));
+                final byte[] buffer = new byte[1024];
+                final FileOutputStream fos = new FileOutputStream(destinationFilePath);
+                final BufferedOutputStream bos = new BufferedOutputStream(fos, 1024);
+                int b;
+                while ((b = bis.read(buffer, 0, 1024)) != -1) {
+                    bos.write(buffer, 0, b);
+                }
+                bos.flush();
+                bos.close();
+                bis.close();
+                final String name = destinationFilePath.getName();
+                if (name.endsWith(".jar") && this.pluginFile(name)) {
+                    destinationFilePath.renameTo(new File(this.plugin.getDataFolder().getParent(), this.updateFolder + "/" + name));
+                }
+                entry = null;
+                destinationFilePath = null;
+            }
+            e = null;
+            zipFile.close();
+            zipFile = null;
+            for (final File dFile : new File(zipPath).listFiles()) {
+                if (dFile.isDirectory() && this.pluginFile(dFile.getName())) {
+                    final File oFile = new File(this.plugin.getDataFolder().getParent(), dFile.getName());
+                    final File[] contents = oFile.listFiles();
+                    for (final File cFile : dFile.listFiles()) {
+                        boolean found = false;
+                        for (final File xFile : contents) {
+                            if (xFile.getName().equals(cFile.getName())) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            cFile.renameTo(new File(oFile.getCanonicalFile() + "/" + cFile.getName()));
+                        }
+                        else {
+                            cFile.delete();
+                        }
+                    }
+                }
+                dFile.delete();
+            }
+            new File(zipPath).delete();
+            fSourceZip.delete();
+        }
+        catch (IOException ex) {
+            this.plugin.getLogger().warning("The auto-updater tried to unzip a new update file, but was unsuccessful.");
+            this.result = UpdateResult.FAIL_DOWNLOAD;
+            ex.printStackTrace();
+        }
+        new File(file).delete();
+    }
+    
+    private boolean pluginFile(final String name) {
+        for (final File file : new File("plugins").listFiles()) {
+            if (file.getName().equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     public boolean read() {
         try {
             final URLConnection conn = this.url.openConnection();
@@ -159,8 +249,8 @@ public class BukkitUpdater extends Updater
             conn.setDoOutput(true);
             final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             final String response = reader.readLine();
-            final JSONArray array = (response != null) ? ((JSONArray)JSONValue.parse(response)) : null;
-            if (array == null || array.size() == 0) {
+            final JSONArray array = (JSONArray)JSONValue.parse(response);
+            if (array.size() == 0) {
                 this.plugin.getLogger().warning("The updater could not find any files for the project id " + this.id);
                 this.result = UpdateResult.FAIL_BADID;
                 return false;

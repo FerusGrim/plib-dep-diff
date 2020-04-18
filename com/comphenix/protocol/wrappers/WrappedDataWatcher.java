@@ -30,7 +30,7 @@ import com.comphenix.protocol.reflect.accessors.ConstructorAccessor;
 import com.comphenix.protocol.reflect.accessors.FieldAccessor;
 import com.comphenix.protocol.reflect.accessors.MethodAccessor;
 
-public class WrappedDataWatcher extends AbstractWrapper implements Iterable<WrappedWatchableObject>, ClonableWrapper
+public class WrappedDataWatcher extends AbstractWrapper implements Iterable<WrappedWatchableObject>
 {
     private static final Class<?> HANDLE_TYPE;
     private static MethodAccessor GETTER;
@@ -40,7 +40,7 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
     private static FieldAccessor ENTITY_FIELD;
     private static FieldAccessor MAP_FIELD;
     private static ConstructorAccessor constructor;
-    private static ConstructorAccessor eggConstructor;
+    private static ConstructorAccessor lightningConstructor;
     private static Object fakeEntity;
     private static final ImmutableBiMap<Class<?>, Integer> CLASS_TO_ID;
     
@@ -82,21 +82,19 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
         if (WrappedDataWatcher.fakeEntity != null) {
             return WrappedDataWatcher.fakeEntity;
         }
-        if (WrappedDataWatcher.eggConstructor == null) {
-            WrappedDataWatcher.eggConstructor = Accessors.getConstructorAccessor(MinecraftReflection.getMinecraftClass("EntityEgg"), MinecraftReflection.getNmsWorldClass(), Double.TYPE, Double.TYPE, Double.TYPE);
+        if (WrappedDataWatcher.lightningConstructor == null) {
+            WrappedDataWatcher.lightningConstructor = Accessors.getConstructorAccessor(MinecraftReflection.getMinecraftClass("EntityLightning"), MinecraftReflection.getNmsWorldClass(), Double.TYPE, Double.TYPE, Double.TYPE, Boolean.TYPE);
         }
-        return WrappedDataWatcher.fakeEntity = WrappedDataWatcher.eggConstructor.invoke(null, 0, 0, 0);
+        return WrappedDataWatcher.fakeEntity = WrappedDataWatcher.lightningConstructor.invoke(null, 0, 0, 0, true);
     }
     
     private Map<Integer, Object> getMap() {
         if (WrappedDataWatcher.MAP_FIELD == null) {
-            try {
-                final FuzzyReflection fuzzy = FuzzyReflection.fromClass(this.handleType, true);
-                WrappedDataWatcher.MAP_FIELD = Accessors.getFieldAccessor(fuzzy.getField(FuzzyFieldContract.newBuilder().banModifier(8).typeDerivedOf(Map.class).build()));
-            }
-            catch (IllegalArgumentException ex) {
-                throw new FieldAccessException("Failed to find watchable object map");
-            }
+            final FuzzyReflection fuzzy = FuzzyReflection.fromClass(this.handleType, true);
+            WrappedDataWatcher.MAP_FIELD = Accessors.getFieldAccessor(fuzzy.getField(FuzzyFieldContract.newBuilder().banModifier(8).typeDerivedOf(Map.class).build()));
+        }
+        if (WrappedDataWatcher.MAP_FIELD == null) {
+            throw new FieldAccessException("Could not find index <-> Item map.");
         }
         return (Map<Integer, Object>)WrappedDataWatcher.MAP_FIELD.get(this.handle);
     }
@@ -208,7 +206,7 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
             final Object value = WrappedDataWatcher.GETTER.invoke(this.handle, object.getHandle());
             return WrappedWatchableObject.getWrapped(value);
         }
-        catch (Exception ex) {
+        catch (RuntimeException ex) {
             return null;
         }
     }
@@ -280,7 +278,6 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
         this.setObject(object, value, false);
     }
     
-    @Override
     public WrappedDataWatcher deepClone() {
         final WrappedDataWatcher clone = new WrappedDataWatcher(this.getEntity());
         if (MinecraftReflection.watcherObjectExists()) {
@@ -371,7 +368,7 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
         WrappedDataWatcher.ENTITY_FIELD = null;
         WrappedDataWatcher.MAP_FIELD = null;
         WrappedDataWatcher.constructor = null;
-        WrappedDataWatcher.eggConstructor = null;
+        WrappedDataWatcher.lightningConstructor = null;
         WrappedDataWatcher.fakeEntity = null;
         CLASS_TO_ID = new ImmutableBiMap.Builder().put((Object)Byte.class, (Object)0).put((Object)Short.class, (Object)1).put((Object)Integer.class, (Object)2).put((Object)Float.class, (Object)3).put((Object)String.class, (Object)4).put((Object)MinecraftReflection.getItemStackClass(), (Object)5).put((Object)MinecraftReflection.getBlockPositionClass(), (Object)6).put((Object)Vector3F.getMinecraftClass(), (Object)7).build();
     }
@@ -398,26 +395,16 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
         
         static WrappedDataWatcherObject fromIndex(final int index) {
             if (MinecraftReflection.watcherObjectExists()) {
-                return new WrappedDataWatcherObject(newHandle(index));
+                return new WrappedDataWatcherObject(index, null);
             }
             return new DummyWatcherObject(index);
         }
         
-        private static Object newHandle(final int index) {
-            Validate.isTrue(index >= 0, "index cannot be negative!");
-            if (WrappedDataWatcherObject.constructor == null) {
-                WrappedDataWatcherObject.constructor = Accessors.getConstructorAccessor(WrappedDataWatcherObject.HANDLE_TYPE.getConstructors()[0]);
-            }
-            return WrappedDataWatcherObject.constructor.invoke(index, null);
-        }
-        
         private static Object newHandle(final int index, final Serializer serializer) {
-            Validate.isTrue(index >= 0, "index cannot be negative!");
-            Validate.notNull((Object)serializer, "serializer cannot be null!");
             if (WrappedDataWatcherObject.constructor == null) {
                 WrappedDataWatcherObject.constructor = Accessors.getConstructorAccessor(WrappedDataWatcherObject.HANDLE_TYPE.getConstructors()[0]);
             }
-            final Object handle = serializer.getHandle();
+            final Object handle = (serializer != null) ? serializer.getHandle() : null;
             return WrappedDataWatcherObject.constructor.invoke(index, handle);
         }
         
@@ -566,30 +553,29 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
         private static List<Serializer> REGISTRY;
         
         public static Serializer get(final Class<?> clazz) {
-            Validate.notNull((Object)clazz, "Class cannot be null!");
+            Validate.notNull((Object)"Class cannot be null!");
             initialize();
             for (final Serializer serializer : Registry.REGISTRY) {
                 if (serializer.getType().equals(clazz)) {
                     return serializer;
                 }
             }
-            throw new IllegalArgumentException("No serializer found for " + clazz);
+            return null;
         }
         
         public static Serializer get(final Class<?> clazz, final boolean optional) {
             Validate.notNull((Object)clazz, "Class cannot be null!");
             initialize();
-            Validate.notEmpty((Collection)Registry.REGISTRY, "Registry has no elements!");
             for (final Serializer serializer : Registry.REGISTRY) {
                 if (serializer.getType().equals(clazz) && serializer.isOptional() == optional) {
                     return serializer;
                 }
             }
-            throw new IllegalArgumentException("No serializer found for " + (optional ? ("Optional<" + clazz + ">") : clazz));
+            return null;
         }
         
         public static Serializer fromHandle(final Object handle) {
-            Validate.notNull(handle, "handle cannot be null!");
+            Validate.notNull((Object)"handle cannot be null!");
             initialize();
             for (final Serializer serializer : Registry.REGISTRY) {
                 if (serializer.getHandle().equals(handle)) {
@@ -609,8 +595,8 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
                         final ParameterizedType type = (ParameterizedType)generic;
                         final Type[] args = type.getActualTypeArguments();
                         final Type arg = args[0];
+                        Class<?> innerClass = null;
                         boolean optional = false;
-                        Class<?> innerClass;
                         if (arg instanceof Class) {
                             innerClass = (Class<?>)arg;
                         }
@@ -628,9 +614,6 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
                         catch (ReflectiveOperationException e) {
                             throw new IllegalStateException("Failed to read field " + candidate);
                         }
-                        if (serializer == null) {
-                            throw new RuntimeException("Failed to read serializer: " + candidate.getName());
-                        }
                         Registry.REGISTRY.add(new Serializer(innerClass, serializer, optional));
                     }
                 }
@@ -638,11 +621,7 @@ public class WrappedDataWatcher extends AbstractWrapper implements Iterable<Wrap
         }
         
         public static Serializer getChatComponentSerializer() {
-            return getChatComponentSerializer(false);
-        }
-        
-        public static Serializer getChatComponentSerializer(final boolean optional) {
-            return get(MinecraftReflection.getIChatBaseComponentClass(), optional);
+            return get(MinecraftReflection.getIChatBaseComponentClass());
         }
         
         public static Serializer getItemStackSerializer(final boolean optional) {

@@ -21,6 +21,6 @@ public class Util
     }
     
     public static boolean isUsingSpigot() {
-        return Bukkit.getServer().getVersion().contains("Spigot") || Bukkit.getServer().getVersion().contains("Paper");
+        return Bukkit.getServer().getVersion().contains("Spigot");
     }
 }
