@@ -1,0 +1,8 @@
+Manifest-Version: 1.0
+Implementation-Title: ProtocolLib
+Implementation-Version: 4.5.1-SNAPSHOT
+Build-Jdk-Spec: 1.8
+Created-By: Maven Jar Plugin 3.2.0
+Implementation-Vendor: dmulloy2
+Main-Class: com.comphenix.protocol.Application
+
