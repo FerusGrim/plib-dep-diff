@@ -1,10 +1,10 @@
 Manifest-Version: 1.0
 Implementation-Title: ProtocolLib
-Implementation-Version: 4.4.0-SNAPSHOT
+Implementation-Version: 4.4.0-SNAPSHOT-b390
 Archiver-Version: Plexus Archiver
-Built-By: FerusGrim
-Created-By: Apache Maven 3.6.3
-Build-Jdk: 1.8.0_221
+Built-By: WIN-QAITGSSVVQC$
+Created-By: Apache Maven 3.3.9
+Build-Jdk: 1.8.0_131
 Implementation-Vendor: dmulloy2
 Main-Class: com.comphenix.protocol.Application
 

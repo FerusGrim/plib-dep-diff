@@ -1,5 +1,5 @@
 name: ProtocolLib
-version: 4.4.0-SNAPSHOT
+version: 4.4.0-SNAPSHOT-b390
 description: Provides read/write access to the Minecraft protocol.
 authors: [dmulloy2, comphenix]
 
